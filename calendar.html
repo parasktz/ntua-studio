@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NTUA STUDIO — Ημερολόγιο κρατήσεων</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap&subset=greek" rel="stylesheet">
+<style>
+  :root{ --bg:#17181B; --panel:#1F2125; --panel-2:#26292E; --line:#33373D;
+         --text:#ECEAE4; --muted:#9BA0A8; --rec:#E23B32; --radius:6px; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--text);
+        font-family:'Commissioner', system-ui, sans-serif; font-size:16px; line-height:1.45; }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  .wrap{ max-width:1100px; margin:0 auto; padding:28px 20px 64px; }
+
+  header{ display:flex; align-items:center; justify-content:space-between; gap:14px;
+          flex-wrap:wrap; margin-bottom:18px; }
+  h1{ font-size:1.3rem; }
+  .nav{ display:flex; align-items:center; gap:12px; }
+  .nav button{ background:none; border:1px solid var(--line); color:var(--text);
+               border-radius:var(--radius); width:36px; height:36px; cursor:pointer; font-size:1.05rem; }
+  .nav button:disabled{ opacity:.3; cursor:default; }
+  .nav .month{ font-weight:500; min-width:170px; text-align:center; }
+  .month-count{ color:var(--muted); font-size:.9rem; }
+
+  /* ── Πλέγμα μήνα ── */
+  .cal{ display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; }
+  .dow{ font-size:.75rem; color:var(--muted); text-align:center; padding:4px 0 6px; }
+  .day{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    min-height:96px; padding:6px; display:flex; flex-direction:column; gap:3px;
+    cursor:pointer; text-align:left; color:var(--text); font-family:inherit; font-size:1rem;
+  }
+  .day:hover{ border-color:var(--muted); }
+  .day.blank{ background:none; border:none; cursor:default; }
+  .day.off{ opacity:.4; }
+  .day.selected{ border-color:var(--rec); }
+  .day .num{ font-family:'JetBrains Mono', monospace; font-size:.82rem; color:var(--muted); }
+  .day.today .num{ color:var(--text); text-decoration:underline; text-underline-offset:3px; }
+  .entry{
+    font-size:.72rem; background:var(--panel-2); border-left:2px solid var(--rec);
+    border-radius:3px; padding:1px 5px; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .entry.blk{ border-left-color:var(--muted); color:var(--muted); border-left-style:dashed; }
+  .entry .mono{ font-size:.7rem; }
+  .more{ font-size:.7rem; color:var(--muted); }
+  /* Μπάρα πληρότητας: πόσα από τα slots της ημέρας είναι κλεισμένα */
+  .fill{ margin-top:auto; height:3px; border-radius:2px; background:var(--panel-2); overflow:hidden; }
+  .fill i{ display:block; height:100%; background:var(--rec); }
+  .badge{ display:none; }
+
+  @media (max-width:680px){
+    .day{ min-height:56px; padding:4px; }
+    .entry, .more{ display:none; }
+    .badge{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:.72rem;
+            color:var(--rec); font-weight:600; }
+  }
+
+  /* ── Λεπτομέρειες ημέρας ── */
+  .detail{ margin-top:20px; background:var(--panel); border:1px solid var(--line);
+           border-radius:var(--radius); padding:18px; display:none; }
+  .detail.show{ display:block; }
+  .detail h2{ font-size:1.05rem; font-weight:500; margin-bottom:4px; }
+  .detail .sub{ color:var(--muted); font-size:.88rem; margin-bottom:12px; }
+  .detail table{ width:100%; border-collapse:collapse; }
+  .detail th{ text-align:left; font-size:.78rem; font-weight:500; color:var(--muted);
+              border-bottom:1px solid var(--line); padding:6px 8px; }
+  .detail td{ padding:8px; border-bottom:1px solid var(--panel-2); font-size:.92rem; }
+  .empty{ color:var(--muted); }
+
+  .status{ color:var(--muted); margin-top:16px; font-size:.9rem; }
+  .day:focus-visible, .nav button:focus-visible{ outline:2px solid var(--text); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Ημερολόγιο κρατήσεων</h1>
+    <div class="nav">
+      <button type="button" id="prevMonth" aria-label="Προηγούμενος μήνας">‹</button>
+      <span class="month" id="monthLabel"></span>
+      <button type="button" id="nextMonth" aria-label="Επόμενος μήνας">›</button>
+    </div>
+    <span class="month-count" id="monthCount"></span>
+  </header>
+
+  <div class="cal" id="cal"></div>
+
+  <section class="detail" id="detail" aria-live="polite">
+    <h2 id="detailDate"></h2>
+    <p class="sub" id="detailSub"></p>
+    <div id="detailBody"></div>
+  </section>
+
+  <p class="status" id="status">Φόρτωση…</p>
+</div>
+
+<script type="module">
+/* ─────────────────────────────────────────────────────────────
+   Ημερολογιακή προβολή όλων των κρατήσεων (μόνο ανάγνωση).
+   Διαβάζει τον κόμβο "bookings" και ενημερώνεται ζωντανά.
+   ───────────────────────────────────────────────────────────── */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getDatabase, ref, onValue }
+  from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
+const MONTHS = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
+                "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"];
+const DAYS = ["Δευ","Τρί","Τετ","Πέμ","Παρ","Σάβ","Κυρ"];
+const $ = id => document.getElementById(id);
+
+let config, viewYear, viewMonth;
+let byDate = {};            // "2026-10-05" -> [ {start,end,name,email,phone}, ... ]
+let selectedDate = null;
+
+const pad = n => String(n).padStart(2, "0");
+const toStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const isoWeekday = d => d.getDay() === 0 ? 7 : d.getDay();
+const toMin = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+const prettyDate = s => { const [y,m,d] = s.split("-");
+  return `${+d} ${MONTHS[+m-1].replace(/ος$/,"ου").replace(/ς$/,"")} ${y}`; };
+
+/* Πόσα slots χωράει συνολικά μια ημέρα (για τη μπάρα πληρότητας) */
+function totalSlots(dateStr){
+  const ov = (config.dateOverrides || {})[dateStr] || {};
+  if (ov.closed) return 0;
+  const start = toMin(ov.start || config.hours.start);
+  const end   = toMin(ov.end   || config.hours.end);
+  const step  = ov.slotMinutes || config.slotMinutes;
+  return Math.max(0, Math.floor((end - start) / step));
+}
+
+function renderMonth(){
+  $("monthLabel").textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+
+  const first = new Date(viewYear, viewMonth, 1);
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const lead = isoWeekday(first) - 1;
+  const todayStr = toStr(new Date());
+
+  let html = DAYS.map(d => `<span class="dow">${d}</span>`).join("");
+  for (let i=0; i<lead; i++) html += `<div class="day blank"></div>`;
+
+  let monthTotal = 0;
+  for (let day=1; day<=daysInMonth; day++){
+    const s = `${viewYear}-${pad(viewMonth+1)}-${pad(day)}`;
+    const list = byDate[s] || [];
+    monthTotal += list.length;
+    const inRange = s >= config.dateRange.start && s <= config.dateRange.end;
+    const cls = ["day", inRange ? "" : "off", s===todayStr ? "today" : "",
+                 s===selectedDate ? "selected" : ""].join(" ").trim();
+
+    const shown = list.slice(0, 3).map(b =>
+      `<span class="entry${b.blocked ? " blk" : ""}"><span class="mono">${b.start}</span> ${esc(b.name)}</span>`).join("");
+    const more = list.length > 3 ? `<span class="more">+${list.length-3} ακόμη</span>` : "";
+    const badge = list.length ? `<span class="badge">●${list.length}</span>` : "";
+    const cap = totalSlots(s);
+    const bar = (inRange && cap)
+      ? `<span class="fill"><i style="width:${Math.min(100, list.length/cap*100)}%"></i></span>` : "";
+
+    html += `<button type="button" class="${cls}" data-date="${s}"
+              aria-label="${prettyDate(s)}, ${list.length} κρατήσεις">
+              <span class="num">${day}</span>${badge}${shown}${more}${bar}</button>`;
+  }
+  $("cal").innerHTML = html;
+  $("monthCount").textContent = `${monthTotal} κρατήσεις τον μήνα`;
+
+  $("cal").querySelectorAll(".day[data-date]").forEach(el =>
+    el.addEventListener("click", () => showDetail(el.dataset.date)));
+
+  const [sy,sm] = config.dateRange.start.split("-").map(Number);
+  const [ey,em] = config.dateRange.end.split("-").map(Number);
+  $("prevMonth").disabled = (viewYear < sy) || (viewYear === sy && viewMonth <= sm-1);
+  $("nextMonth").disabled = (viewYear > ey) || (viewYear === ey && viewMonth >= em-1);
+}
+
+function showDetail(dateStr){
+  selectedDate = dateStr;
+  const list = byDate[dateStr] || [];
+  $("detail").classList.add("show");
+  $("detailDate").textContent = prettyDate(dateStr);
+  $("detailSub").textContent = list.length
+    ? `${list.length} από ${totalSlots(dateStr)} slots δεσμευμένα`
+    : "";
+  $("detailBody").innerHTML = list.length
+    ? `<table><thead><tr><th>Ώρα</th><th>Ονοματεπώνυμο</th><th>Email</th><th>Τηλέφωνο</th></tr></thead>
+       <tbody>${list.map(b => `<tr>
+         <td class="mono">${b.start}–${b.end}</td>
+         <td>${esc(b.name)}</td>
+         <td>${esc(b.email) || "—"}</td>
+         <td>${esc(b.phone) || "—"}</td></tr>`).join("")}</tbody></table>`
+    : `<p class="empty">Καμία κράτηση αυτή την ημέρα.</p>`;
+  renderMonth();
+}
+
+function shiftMonth(delta){
+  viewMonth += delta;
+  if (viewMonth < 0){ viewMonth = 11; viewYear--; }
+  if (viewMonth > 11){ viewMonth = 0; viewYear++; }
+  renderMonth();
+}
+
+const esc = v => String(v ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function init(){
+  try{ config = await (await fetch("config.json", { cache:"no-store" })).json(); }
+  catch{ $("status").textContent = "Δεν βρέθηκε το config.json — δοκίμασε μέσω GitHub Pages ή τοπικού server."; return; }
+  if (!config.firebase || /ΒΑΛΕ/.test(config.firebase.apiKey || "")){
+    $("status").textContent = "Δεν έχει ρυθμιστεί το Firebase στο config.json (δες README)."; return;
+  }
+
+  /* Το ημερολόγιο ανοίγει στον τρέχοντα μήνα αν είναι μέσα στην περίοδο, αλλιώς στην αρχή της */
+  const today = new Date();
+  const clamp = s => { const [y,m] = s.split("-").map(Number); return { y, m: m-1 }; };
+  const a = clamp(config.dateRange.start), b = clamp(config.dateRange.end);
+  viewYear = today.getFullYear(); viewMonth = today.getMonth();
+  if (viewYear*12+viewMonth < a.y*12+a.m){ viewYear = a.y; viewMonth = a.m; }
+  if (viewYear*12+viewMonth > b.y*12+b.m){ viewYear = b.y; viewMonth = b.m; }
+
+  $("prevMonth").addEventListener("click", () => shiftMonth(-1));
+  $("nextMonth").addEventListener("click", () => shiftMonth(1));
+
+  const db = getDatabase(initializeApp(config.firebase));
+  onValue(ref(db, "bookings"), snap => {
+    const data = snap.val() || {};
+    byDate = {};
+    for (const [date, slots] of Object.entries(data)){
+      byDate[date] = Object.entries(slots).map(([id, b]) => ({
+        start: b.start || id.replace("-",":"), end: b.end || "",
+        name: b.name || "", email: b.email || "", phone: b.phone || "",
+        blocked: !!b.blocked
+      })).sort((x,y) => x.start.localeCompare(y.start));
+    }
+    $("status").textContent = "Η προβολή ενημερώνεται αυτόματα με κάθε νέα κράτηση.";
+    renderMonth();
+    if (selectedDate) showDetail(selectedDate);
+  }, () => { $("status").textContent = "Σφάλμα σύνδεσης με τη βάση."; });
+
+  renderMonth();
+}
+init();
+</script>
+</body>
+</html>
