@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Χρονοπρογραμματισμός — Studio Βιντεοσκόπησης</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&subset=greek&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
+  <div class="session-title" id="topSessionTitle"></div>
+  <div class="spacer"></div>
+  <nav>
+    <a href="index.html">Αίτηση</a>
+    <a href="schedule.html" class="active">Χρονοπρογραμματισμός</a>
+  </nav>
+  <span class="who" id="topWho"></span>
+  <button class="btn secondary small hidden" id="btnLogout">Αποσύνδεση</button>
+</header>
+
+<!-- Είσοδος χρήστη -->
+<main class="wrap narrow" id="schedGate">
+  <h1>Χρονοπρογραμματισμός βιντεοσκόπησης</h1>
+  <p class="sub">Συνδεθείτε με το ιδρυματικό σας email και τον κωδικό που λάβατε στο email έγκρισης. Ο κωδικός δεν έχει ημερομηνία λήξης.</p>
+  <div class="card">
+    <div id="gateErr" class="msg-err hidden"></div>
+    <form id="formGate">
+      <label for="gateEmail">Ιδρυματικό email</label>
+      <input type="email" id="gateEmail" required autocomplete="username">
+      <label for="gatePass">Κωδικός</label>
+      <input type="password" id="gatePass" required autocomplete="current-password">
+      <div class="btn-row">
+        <button class="btn" type="submit">Σύνδεση</button>
+        <button class="btn secondary" type="button" id="btnForgot">Ξέχασα τον κωδικό</button>
+      </div>
+      <p class="hint" style="margin-top:14px">Δεν έχετε κωδικό; <a href="index.html">Υποβάλετε αίτηση βιντεοσκόπησης</a>.</p>
+    </form>
+  </div>
+</main>
+
+<!-- Μήνυμα (φόρτωση / μη εγκεκριμένος) -->
+<main class="wrap narrow hidden" id="schedInfo">
+  <div class="card">
+    <div class="msg-err" id="schedInfoMsg"></div>
+    <button class="btn secondary" onclick="auth.signOut()">Αποσύνδεση</button>
+  </div>
+</main>
+
+<!-- Κύρια προβολή -->
+<main class="wrap hidden" id="schedMain">
+  <h1 id="schedTitle"></h1>
+  <p class="sub" id="schedSub"></p>
+  <div class="card">
+    <div id="userCal"></div>
+    <p class="hint" style="margin-top:12px">Κλικ σε κενό slot για κράτηση (έως 4 ώρες/ημέρα) · κλικ σε δική σας κράτηση για αλλαγή περιγραφής ή ακύρωση. Αλλαγές επιτρέπονται έως 1 ημέρα πριν από την ημερομηνία βιντεοσκόπησης.</p>
+  </div>
+  <div class="card">
+    <h2>Οι κρατήσεις μου</h2>
+    <div id="mySlots"></div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="mTitle"></h3>
+    <div class="meta" id="mMeta"></div>
+    <div id="mBody"></div>
+    <div class="btn-row" id="mBtns"></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+/* Προσυμπλήρωση email από τον σύνδεσμο του email έγκρισης (?email=...) */
+const preEmail = normEmail(new URLSearchParams(location.search).get("email"));
+if (preEmail) $("gateEmail").value = preEmail;
+
+let me = null;   // συνδεδεμένος χρήστης (firebase user)
+
+auth.onAuthStateChanged(u => { me = u; render(); });
+watchData(render);
+
+function myRequest() {
+  if (!me) return null;
+  return approvedUsers().find(x => normEmail(x.email) === normEmail(me.email)) || null;
+}
+
+function render() {
+  const logged = !!me;
+  $("btnLogout").classList.toggle("hidden", !logged);
+  $("topWho").textContent = logged ? me.email : "";
+  $("schedGate").classList.toggle("hidden", logged);
+
+  if (!logged) { $("schedInfo").classList.add("hidden"); $("schedMain").classList.add("hidden"); return; }
+
+  if (!S.reqReady) {
+    $("schedMain").classList.add("hidden");
+    $("schedInfo").classList.remove("hidden");
+    $("schedInfoMsg").className = "msg-ok";
+    $("schedInfoMsg").textContent = "Φόρτωση δεδομένων…";
+    return;
+  }
+  const r = myRequest();
+  if (!r) {
+    $("schedMain").classList.add("hidden");
+    $("schedInfo").classList.remove("hidden");
+    $("schedInfoMsg").className = "msg-err";
+    $("schedInfoMsg").textContent = "Δεν υπάρχει εγκεκριμένο αίτημα για τον λογαριασμό " + me.email + " στην τρέχουσα περίοδο. Αν μόλις υποβάλατε αίτηση, περιμένετε την έγκριση του διαχειριστή.";
+    return;
+  }
+  $("schedInfo").classList.add("hidden");
+  $("schedMain").classList.remove("hidden");
+  $("schedTitle").textContent = S.session ? S.session.title : "Χρονοπρογραμματισμός";
+  $("schedSub").textContent = `${r.name} · ${normEmail(me.email)}` +
+    (S.session ? ` · Περίοδος ${fmtDate(S.session.dateFrom)} – ${fmtDate(S.session.dateTo)}, ${pad(S.session.hourStart)}:00–${pad(S.session.hourEnd)}:00` : "");
+  buildCalendar("userCal", "user", me.email, userCellClick);
+  renderMySlots();
+}
+
+/* ---------- Είσοδος / επαναφορά κωδικού ---------- */
+$("formGate").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("gateErr").classList.add("hidden");
+  try {
+    await auth.signInWithEmailAndPassword(normEmail($("gateEmail").value), $("gatePass").value);
+  } catch (err) {
+    $("gateErr").textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός. Ο κωδικός σάς έχει σταλεί στο email έγκρισης.";
+    $("gateErr").classList.remove("hidden");
+  }
+});
+
+$("btnForgot").addEventListener("click", async () => {
+  const email = normEmail($("gateEmail").value);
+  if (!email) { toast("Συμπληρώστε πρώτα το email σας.", true); return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    toast("Στάλθηκε email επαναφοράς κωδικού από το Firebase. Ο σύνδεσμος επαναφοράς ισχύει για περιορισμένο χρόνο — ο νέος κωδικός που θα ορίσετε δεν λήγει.");
+  } catch (e) { toast("Αποτυχία αποστολής email επαναφοράς.", true); }
+});
+
+/* ---------- Κρατήσεις χρήστη ---------- */
+function userCellClick(date, hour) {
+  const b = S.bookings?.[date]?.[hour];
+  const blocked = !!S.blocked?.[date]?.[hour];
+  if (daysDiff(date) < 0) return;
+  if (blocked) { toast("Το studio δεν είναι διαθέσιμο σε αυτό το slot.", true); return; }
+  if (!userCanEditDate(date)) { toast("Οι αλλαγές επιτρέπονται έως 1 ημέρα πριν από την ημερομηνία.", true); return; }
+  if (b && normEmail(b.email) !== normEmail(me.email)) { toast("Το slot είναι δεσμευμένο από άλλον χρήστη.", true); return; }
+
+  if (b) {
+    openModal({
+      title: "Η κράτησή μου",
+      meta: `${fmtDate(date)} · ${fmtHour(hour)}`,
+      bodyHTML: `<label for="mDesc">Περιγραφή εργασίας</label><textarea id="mDesc">${esc(b.desc || "")}</textarea>`,
+      buttons: [
+        { label: "Άκυρο" },
+        { label: "Ακύρωση κράτησης", kind: "danger", onClick: async () => {
+            await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).remove();
+            toast("Η κράτηση ακυρώθηκε.");
+            queueChangeEmail(me.email, false);
+          } },
+        { label: "Αποθήκευση", kind: "", onClick: async () => {
+            await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).update({ desc: $("mDesc").value.trim(), updatedAt: Date.now() });
+            toast("Η περιγραφή ενημερώθηκε.");
+            queueChangeEmail(me.email, false);
+          } }
+      ]
+    });
+    return;
+  }
+
+  if (userHoursOn(me.email, date) >= MAX_HOURS_PER_DATE) {
+    toast(`Έχετε ήδη ${MAX_HOURS_PER_DATE} ώρες στις ${fmtDate(date)} (μέγιστο).`, true); return;
+  }
+  const r = myRequest();
+  openModal({
+    title: "Νέα κράτηση",
+    meta: `${fmtDate(date)} · ${fmtHour(hour)}`,
+    bodyHTML: `<label for="mDesc">Περιγραφή εργασίας για αυτό το slot</label><textarea id="mDesc" placeholder="π.χ. Βιντεοσκόπηση διάλεξης 3ου κεφαλαίου"></textarea>`,
+    buttons: [
+      { label: "Άκυρο" },
+      { label: "Κράτηση slot", kind: "", onClick: () => {
+          const desc = $("mDesc").value.trim();
+          if (!desc) { toast("Συμπληρώστε περιγραφή εργασίας.", true); return false; }
+          db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).transaction(cur => {
+            if (cur) return;                       // κάποιος πρόλαβε
+            return { email: normEmail(me.email), name: r?.name || "", desc, updatedAt: Date.now() };
+          }, (err, committed) => {
+            if (err || !committed) { toast("Το slot μόλις δεσμεύτηκε από άλλον χρήστη.", true); return; }
+            toast("Η κράτηση καταχωρήθηκε.");
+            queueChangeEmail(me.email, false);
+          });
+        } }
+    ]
+  });
+}
+
+function renderMySlots() {
+  const box = $("mySlots");
+  const slots = userSlots(me.email);
+  if (!slots.length) { box.innerHTML = '<p class="empty">Δεν έχετε κρατήσεις ακόμη — επιλέξτε slots στο ημερολόγιο.</p>'; return; }
+  box.innerHTML = `<ul class="slots-list">` + slots.map(s => {
+    const locked = !userCanEditDate(s.date);
+    return `<li><span class="mono">${fmtDate(s.date)} ${fmtHour(s.hour)}</span> — ${esc(s.desc || "")}${locked ? ' <span class="badge">κλειδωμένο</span>' : ""}</li>`;
+  }).join("") + `</ul>`;
+}
+</script>
+</body>
+</html>
