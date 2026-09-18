@@ -25,6 +25,9 @@
   .nav button:disabled{ opacity:.3; cursor:default; }
   .nav .month{ font-weight:500; min-width:170px; text-align:center; }
   .month-count{ color:var(--muted); font-size:.9rem; }
+  .userbar{ color:var(--muted); font-size:.85rem; }
+  .linkish{ background:none; border:none; color:var(--text); text-decoration:underline;
+            text-underline-offset:3px; cursor:pointer; font:inherit; font-size:.85rem; padding:0; }
 
   /* ── Πλέγμα μήνα ── */
   .cal{ display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; }
@@ -86,6 +89,7 @@
       <button type="button" id="nextMonth" aria-label="Επόμενος μήνας">›</button>
     </div>
     <span class="month-count" id="monthCount"></span>
+    <span class="userbar" id="userBox"></span>
   </header>
 
   <div class="cal" id="cal"></div>
@@ -107,6 +111,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getDatabase, ref, onValue }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { requireAuth, signOut as fbSignOut } from "./auth.js";
 
 const MONTHS = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
                 "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"];
@@ -225,21 +230,31 @@ async function init(){
   $("prevMonth").addEventListener("click", () => shiftMonth(-1));
   $("nextMonth").addEventListener("click", () => shiftMonth(1));
 
-  const db = getDatabase(initializeApp(config.firebase));
-  onValue(ref(db, "bookings"), snap => {
-    const data = snap.val() || {};
-    byDate = {};
-    for (const [date, slots] of Object.entries(data)){
-      byDate[date] = Object.entries(slots).map(([id, b]) => ({
-        start: b.start || id.replace("-",":"), end: b.end || "",
-        name: b.name || "", email: b.email || "", phone: b.phone || "",
-        blocked: !!b.blocked
-      })).sort((x,y) => x.start.localeCompare(y.start));
-    }
-    $("status").textContent = "Η προβολή ενημερώνεται αυτόματα με κάθε νέα κράτηση.";
-    renderMonth();
-    if (selectedDate) showDetail(selectedDate);
-  }, () => { $("status").textContent = "Σφάλμα σύνδεσης με τη βάση."; });
+  const app = initializeApp(config.firebase);
+  /* Απαιτείται σύνδεση με εγκεκριμένο λογαριασμό ΕΜΠ */
+  requireAuth(app, (user, auth) => {
+    if (init.started) return;            // προστασία από διπλή εκκίνηση
+    init.started = true;
+    $("userBox").innerHTML =
+      `${user.email} · <button type="button" class="linkish" id="logoutBtn">Αποσύνδεση</button>`;
+    $("logoutBtn").addEventListener("click", () => fbSignOut(auth));
+
+    const db = getDatabase(app);
+    onValue(ref(db, "bookings"), snap => {
+      const data = snap.val() || {};
+      byDate = {};
+      for (const [date, slots] of Object.entries(data)){
+        byDate[date] = Object.entries(slots).map(([id, b]) => ({
+          start: b.start || id.replace("-",":"), end: b.end || "",
+          name: b.name || "", email: b.email || "", phone: b.phone || "",
+          blocked: !!b.blocked
+        })).sort((x,y) => x.start.localeCompare(y.start));
+      }
+      $("status").textContent = "Η προβολή ενημερώνεται αυτόματα με κάθε νέα κράτηση.";
+      renderMonth();
+      if (selectedDate) showDetail(selectedDate);
+    }, () => { $("status").textContent = "Σφάλμα σύνδεσης με τη βάση."; });
+  });
 
   renderMonth();
 }

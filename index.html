@@ -35,6 +35,9 @@
   @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
   h1{ font-size:1.45rem; font-weight:700; letter-spacing:.02em; }
   .subtitle{ color:var(--muted); font-size:1rem; }
+  .userbar{ margin-left:auto; color:var(--muted); font-size:.85rem; }
+  .linkish{ background:none; border:none; color:var(--text); text-decoration:underline;
+            text-underline-offset:3px; cursor:pointer; font:inherit; font-size:.85rem; padding:0; }
 
   .notes{ color:var(--muted); margin-bottom:24px; max-width:64ch; }
 
@@ -143,6 +146,7 @@
     <span class="rec-dot" aria-hidden="true"></span>
     <h1 id="title">NTUA STUDIO</h1>
     <span class="subtitle" id="subtitle">Χρονοπρογραμματισμός βιντεοσκόπησης</span>
+    <span class="userbar" id="userBox"></span>
   </header>
 
   <div class="banner" id="setupBanner" style="display:none">
@@ -216,6 +220,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getDatabase, ref, onValue, runTransaction, get, remove }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { requireAuth, signOut as fbSignOut } from "./auth.js";
 
 const MONTHS = ["Ιανουάριος","Φεβρουάριος","Μάρτιος","Απρίλιος","Μάιος","Ιούνιος",
                 "Ιούλιος","Αύγουστος","Σεπτέμβριος","Οκτώβριος","Νοέμβριος","Δεκέμβριος"];
@@ -521,34 +526,51 @@ async function init(){
   if (f.email?.required) $("emailField").querySelector("label").textContent += " *";
   if (f.phone?.required) $("phoneField").querySelector("label").textContent += " *";
 
-  /* Firebase — αν δεν έχει ρυθμιστεί, demo mode με ενημερωτικό banner */
+  /* Κοινή εκκίνηση του UI (τρέχει σε demo mode ή μετά τη σύνδεση) */
+  const startApp = user => {
+    if (user){
+      $("userBox").innerHTML =
+        `${user.email} · <button type="button" class="linkish" id="logoutBtn">Αποσύνδεση</button>`;
+      if (f.email?.show !== false && !$("email").value) $("email").value = user.email;
+    }
+
+    /* Το ημερολόγιο ξεκινά στον πρώτο μήνα με διαθέσιμες ημερομηνίες */
+    const today = new Date(); today.setHours(0,0,0,0);
+    const start = fromStr(config.dateRange.start);
+    const view = today > start ? today : start;
+    viewYear = view.getFullYear(); viewMonth = view.getMonth();
+
+    $("prevMonth").addEventListener("click", () => shiftMonth(-1));
+    $("nextMonth").addEventListener("click", () => shiftMonth(1));
+    $("bookingForm").addEventListener("submit", submitBooking);
+
+    $("manageHint").textContent =
+      `Γράψε τον κωδικό διαχείρισης που πήρες κατά την κράτηση για να δεις τα slots σου ` +
+      `ή να τα ακυρώσεις — έως ${editDays()} μέρες πριν την ημερομηνία τους. ` +
+      `Για αλλαγή ώρας, ακύρωσε το slot και κλείσε νέο από πάνω.`;
+    $("manageFind").addEventListener("click", findMine);
+    $("manageCode").addEventListener("keydown", e => {
+      if (e.key === "Enter"){ e.preventDefault(); findMine(); }
+    });
+
+    renderCalendar();
+  };
+
+  /* Firebase — αν δεν έχει ρυθμιστεί, demo mode χωρίς σύνδεση */
   if (!config.firebase || /ΒΑΛΕ/.test(config.firebase.apiKey || "")){
     demoMode = true;
     $("setupBanner").style.display = "block";
+    startApp(null);
   } else {
-    db = getDatabase(initializeApp(config.firebase));
+    const app = initializeApp(config.firebase);
+    /* Απαιτείται σύνδεση με εγκεκριμένο λογαριασμό ΕΜΠ (δες auth.js) */
+    requireAuth(app, (user, auth) => {
+      if (db) return;                      // προστασία από διπλή εκκίνηση
+      db = getDatabase(app);
+      startApp(user);
+      $("logoutBtn").addEventListener("click", () => fbSignOut(auth));
+    });
   }
-
-  /* Το ημερολόγιο ξεκινά στον πρώτο μήνα με διαθέσιμες ημερομηνίες */
-  const today = new Date(); today.setHours(0,0,0,0);
-  const start = fromStr(config.dateRange.start);
-  const view = today > start ? today : start;
-  viewYear = view.getFullYear(); viewMonth = view.getMonth();
-
-  $("prevMonth").addEventListener("click", () => shiftMonth(-1));
-  $("nextMonth").addEventListener("click", () => shiftMonth(1));
-  $("bookingForm").addEventListener("submit", submitBooking);
-
-  $("manageHint").textContent =
-    `Γράψε τον κωδικό διαχείρισης που πήρες κατά την κράτηση για να δεις τα slots σου ` +
-    `ή να τα ακυρώσεις — έως ${editDays()} μέρες πριν την ημερομηνία τους. ` +
-    `Για αλλαγή ώρας, ακύρωσε το slot και κλείσε νέο από πάνω.`;
-  $("manageFind").addEventListener("click", findMine);
-  $("manageCode").addEventListener("keydown", e => {
-    if (e.key === "Enter"){ e.preventDefault(); findMine(); }
-  });
-
-  renderCalendar();
 }
 
 init();

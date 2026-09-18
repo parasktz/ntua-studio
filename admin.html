@@ -19,6 +19,12 @@
           flex-wrap:wrap; border-bottom:1px solid var(--line);
           padding-bottom:16px; margin-bottom:20px; }
   h1{ font-size:1.3rem; }
+  .userbar{ color:var(--muted); font-size:.85rem; }
+  .linkish{ background:none; border:none; color:var(--text); text-decoration:underline;
+            text-underline-offset:3px; cursor:pointer; font:inherit; font-size:.85rem; padding:0; }
+  .req-item{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+             padding:10px 2px; border-bottom:1px solid #26292E; flex-wrap:wrap; }
+  .req-actions{ display:flex; gap:8px; flex-wrap:wrap; }
   .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
   select, input[type=search]{
     padding:8px 12px; border-radius:var(--radius); border:1px solid var(--line);
@@ -71,7 +77,16 @@
   <header>
     <h1>Κρατήσεις studio</h1>
     <span class="count" id="count"></span>
+    <span class="userbar" id="userBox"></span>
   </header>
+
+  <section class="block-panel" aria-label="Αιτήματα πρόσβασης">
+    <h2>Αιτήματα πρόσβασης</h2>
+    <p class="sub">Νέοι χρήστες κάνουν αίτημα από τη σελίδα σύνδεσης με ονοματεπώνυμο και email ΕΜΠ.
+    Με την «Έγκριση», το email με τον σύνδεσμο σύνδεσης στέλνεται αυτόματα στον χρήστη.
+    Οι ήδη εγκεκριμένοι λαμβάνουν συνδέσμους μόνοι τους, χωρίς νέα έγκριση.</p>
+    <div id="reqList"><p class="sub">Φόρτωση…</p></div>
+  </section>
 
   <section class="block-panel" aria-label="Μη διαθεσιμότητα studio">
     <h2>Μη διαθεσιμότητα studio</h2>
@@ -113,8 +128,9 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getDatabase, ref, onValue, runTransaction, remove }
+import { getDatabase, ref, onValue, runTransaction, remove, set }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { requireAuth, signOut as fbSignOut, isAdmin, sendLoginLink } from "./auth.js";
 
 const $ = id => document.getElementById(id);
 const MONTHS = ["Ιαν","Φεβ","Μαρ","Απρ","Μαΐ","Ιουν","Ιουλ","Αυγ","Σεπ","Οκτ","Νοε","Δεκ"];
@@ -123,6 +139,8 @@ let all = [];                 // επίπεδη λίστα για τον πίν�
 let raw = {};                 // πλήρες snapshot της βάσης ανά ημερομηνία
 let blockDate = "";           // ημερομηνία στο πάνελ μη διαθεσιμότητας
 let blockSel = new Set();     // επιλεγμένα slots προς αποκλεισμό
+let requests = {};            // εκκρεμή αιτήματα πρόσβασης
+let currentUser = null, authRef = null;
 
 const pad = n => String(n).padStart(2, "0");
 const now0 = new Date();
@@ -273,6 +291,50 @@ async function unblock(id){
   catch{ alert("Η άρση απορρίφθηκε από τους κανόνες ή υπήρξε σφάλμα σύνδεσης."); }
 }
 
+/* ── Αιτήματα πρόσβασης ── */
+function renderRequests(){
+  const box = $("reqList");
+  const keys = Object.keys(requests)
+    .sort((a,b) => (requests[a].requestedAt || 0) - (requests[b].requestedAt || 0));
+  if (!keys.length){ box.innerHTML = `<p class="sub">Κανένα αίτημα σε εκκρεμότητα.</p>`; return; }
+  box.innerHTML = keys.map(k => {
+    const r = requests[k] || {};
+    return `<div class="req-item">
+      <span><strong>${esc(r.name || "—")}</strong> · <span class="mono">${esc(r.email || k.replace(/,/g,"."))}</span></span>
+      <span class="req-actions">
+        <button type="button" class="btn btn-rec" data-approve="${k}">Έγκριση & αποστολή συνδέσμου</button>
+        <button type="button" class="btn" data-reject="${k}">Απόρριψη</button>
+      </span>
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-approve]").forEach(b =>
+    b.addEventListener("click", () => approveReq(b.dataset.approve)));
+  box.querySelectorAll("[data-reject]").forEach(b =>
+    b.addEventListener("click", () => rejectReq(b.dataset.reject)));
+}
+
+async function approveReq(key){
+  const r = requests[key];
+  if (!r) return;
+  try{
+    /* 1. Καταχώρηση έγκρισης — από εδώ και πέρα ο χρήστης έχει πρόσβαση */
+    await set(ref(db, `approved/${key}`),
+      { name: r.name || "", email: r.email || "", approvedAt: Date.now(), by: currentUser.email });
+    /* 2. Τώρα (και μόνο τώρα) φεύγει το email με τον σύνδεσμο σύνδεσης */
+    await sendLoginLink(authRef, r.email);
+    /* 3. Το αίτημα κλείνει */
+    await remove(ref(db, `requests/${key}`));
+  }catch{
+    alert("Η έγκριση ή η αποστολή του email απέτυχε — δοκίμασε ξανά. Αν επιμένει, έλεγξε ότι το «Email link» είναι ενεργό στο Firebase Authentication.");
+  }
+}
+
+async function rejectReq(key){
+  if (!confirm("Απόρριψη του αιτήματος; Ο χρήστης θα μπορεί να υποβάλει νέο.")) return;
+  try{ await remove(ref(db, `requests/${key}`)); }
+  catch{ alert("Η απόρριψη απέτυχε."); }
+}
+
 /* ── Εκκίνηση ── */
 async function init(){
   try{ config = await (await fetch("config.json", { cache:"no-store" })).json(); }
@@ -280,19 +342,41 @@ async function init(){
   if (!config.firebase || /ΒΑΛΕ/.test(config.firebase.apiKey || "")){
     $("rows").innerHTML = "<tr><td colspan='5'>Δεν έχει ρυθμιστεί το Firebase στο config.json.</td></tr>"; return;
   }
-  db = getDatabase(initializeApp(config.firebase));
-  onValue(ref(db, "bookings"), snap => {
-    raw = snap.val() || {};
-    all = [];
-    for (const [date, slots] of Object.entries(raw))
-      for (const [id, b] of Object.entries(slots))
-        all.push({ date, start: b.start || id.replace("-",":"), end: b.end || "",
-                   name: b.name || "", email: b.email || "", phone: b.phone || "",
-                   blocked: !!b.blocked });
-    all.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
-    render();
-    renderBlockGrid();
-  }, () => { $("rows").innerHTML = "<tr><td colspan='5'>Σφάλμα σύνδεσης με τη βάση.</td></tr>"; });
+  const app = initializeApp(config.firebase);
+  /* Απαιτείται σύνδεση ΚΑΙ ρόλος διαχειριστή (κόμβος admins στη βάση) */
+  requireAuth(app, async (user, auth) => {
+    if (db) return;                       // προστασία από διπλή εκκίνηση
+    currentUser = user; authRef = auth;
+    $("userBox").innerHTML =
+      `${user.email} · <button type="button" class="linkish" id="logoutBtn">Αποσύνδεση</button>`;
+    $("logoutBtn").addEventListener("click", () => fbSignOut(auth));
+
+    if (!(await isAdmin(app, user.email))){
+      document.querySelector(".wrap").innerHTML =
+        `<p>Η σελίδα διαχείρισης είναι διαθέσιμη μόνο σε διαχειριστές.
+         <a href="index.html" style="color:var(--text)">Επιστροφή στις κρατήσεις</a></p>`;
+      return;
+    }
+
+    db = getDatabase(app);
+    onValue(ref(db, "bookings"), snap => {
+      raw = snap.val() || {};
+      all = [];
+      for (const [date, slots] of Object.entries(raw))
+        for (const [id, b] of Object.entries(slots))
+          all.push({ date, start: b.start || id.replace("-",":"), end: b.end || "",
+                     name: b.name || "", email: b.email || "", phone: b.phone || "",
+                     blocked: !!b.blocked });
+      all.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
+      render();
+      renderBlockGrid();
+    }, () => { $("rows").innerHTML = "<tr><td colspan='5'>Σφάλμα σύνδεσης με τη βάση.</td></tr>"; });
+
+    onValue(ref(db, "requests"), snap => {
+      requests = snap.val() || {};
+      renderRequests();
+    }, () => { $("reqList").innerHTML = `<p class="sub">Σφάλμα φόρτωσης αιτημάτων.</p>`; });
+  });
 
   const bd = $("blockDate");
   bd.min = config.dateRange.start > todayStr ? config.dateRange.start : todayStr;
