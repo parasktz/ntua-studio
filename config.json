@@ -22,8 +22,6 @@
     "phone": { "show": true, "required": false }
   },
 
- // Initialize Firebase
-const app = initializeApp(firebaseConfig);
   "firebase": {
     apiKey: "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
     authDomain: "ntua-studio.firebaseapp.com",
