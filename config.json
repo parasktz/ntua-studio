@@ -22,13 +22,15 @@
     "phone": { "show": true, "required": false }
   },
 
+ // Initialize Firebase
+const app = initializeApp(firebaseConfig);
   "firebase": {
-    "apiKey": "ΒΑΛΕ_ΕΔΩ_ΤΟ_API_KEY",
-    "authDomain": "your-project.firebaseapp.com",
-    "databaseURL": "https://your-project-default-rtdb.europe-west1.firebasedatabase.app",
-    "projectId": "your-project",
-    "storageBucket": "your-project.appspot.com",
-    "messagingSenderId": "000000000000",
-    "appId": "1:000000000000:web:0000000000000000"
+    apiKey: "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
+    authDomain: "ntua-studio.firebaseapp.com",
+    databaseURL: "https://ntua-studio-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "ntua-studio",
+    storageBucket: "ntua-studio.firebasestorage.app",
+    messagingSenderId: "310321089066",
+    appId: "1:310321089066:web:9b46d1fe8db08ae879d153"
   }
 }
