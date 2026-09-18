@@ -9,7 +9,7 @@
 | `login.html` | **Αρχική σελίδα**: φόρμα ονοματεπώνυμου + email ΕΜΠ, αίτημα πρόσβασης, σύνδεση |
 | `index.html` | Η σελίδα κρατήσεων (μόνο για συνδεδεμένους/εγκεκριμένους) |
 | `calendar.html` | Μηνιαίο ημερολόγιο με τις δεσμευμένες ημέρες και ώρες |
-| `admin.html` | Έγκριση αιτημάτων, λίστα κρατήσεων + CSV, κλείδωμα μη διαθέσιμων slots (μόνο διαχειριστές) |
+| `admin.html` | Έγκριση αιτημάτων, κρατήσεις + CSV, μη διαθεσιμότητα — είσοδος διαχειριστή με email + κωδικό |
 | `auth.js` | Κοινή λογική σύνδεσης όλων των σελίδων |
 | `config.json` | Όλες οι ρυθμίσεις — ημερομηνίες, ώρες, slots, Firebase |
 
@@ -20,6 +20,7 @@
 3. Ο διαχειριστής πατά «Έγκριση & αποστολή συνδέσμου» → ο χρήστης λαμβάνει email με σύνδεσμο σύνδεσης μίας χρήσης.
 4. Πατώντας τον σύνδεσμο, ο χρήστης συνδέεται και μπαίνει στη σελίδα κρατήσεων. **Δεν υπάρχουν κωδικοί πρόσβασης πουθενά.**
 5. Οι ήδη εγκεκριμένοι χρήστες παίρνουν νέο σύνδεσμο μόνοι τους από το `login.html`, χωρίς νέα έγκριση. Η «Απόρριψη» σβήνει το αίτημα (ο χρήστης μπορεί να ξαναϋποβάλει)· ανάκληση πρόσβασης γίνεται σβήνοντας την εγγραφή του από τον κόμβο `approved` στην κονσόλα του Firebase.
+6. **Ο διαχειριστής δεν χρησιμοποιεί συνδέσμους email**: ανοίγει απευθείας το `admin.html` και συνδέεται με το email του και τον κωδικό που έχει ορίσει στο Firebase (Authentication → Users). Η σελίδα ελέγχει επιπλέον ότι το email του βρίσκεται στον κόμβο `admins` της βάσης.
 
 Τι αποθηκεύεται πού: στη **βάση των κρατήσεων** δεν μπαίνει τίποτα σχετικό με τη σύνδεση — ούτε κωδικοί (δεν υπάρχουν καν), ούτε sessions. Το επιβεβαιωμένο email τηρείται μόνο στην υπηρεσία **Firebase Authentication** ως ταυτότητα, και στους κόμβους `requests`/`approved` κρατιούνται ονοματεπώνυμο + email για τη διαδικασία έγκρισης. Σημείωση διαφάνειας: αυτό **δεν** είναι το επίσημο SSO του ΕΜΠ (login.ntua.gr) — κάτι τέτοιο θα απαιτούσε εγγραφή της εφαρμογής στο Κέντρο Δικτύων του ΕΜΠ. Η λύση επαληθεύει την κατοχή ιδρυματικού γραμματοκιβωτίου, που πρακτικά περιορίζει τη χρήση σε μέλη του ΕΜΠ.
 
@@ -35,10 +36,10 @@
 {
   "rules": {
     "bookings": {
-      ".read": "auth != null && auth.token.email_verified === true && (auth.token.email.endsWith('@ntua.gr') || auth.token.email.endsWith('.ntua.gr')) && (root.child('approved').child(auth.token.email.replace('.', ',')).exists() || root.child('admins').child(auth.token.email.replace('.', ',')).exists())",
+      ".read": "auth != null && (root.child('admins').child(auth.token.email.replace('.', ',')).exists() || (auth.token.email_verified === true && (auth.token.email.endsWith('@ntua.gr') || auth.token.email.endsWith('.ntua.gr')) && root.child('approved').child(auth.token.email.replace('.', ',')).exists()))",
       "$date": {
         "$slot": {
-          ".write": "auth != null && auth.token.email_verified === true && (auth.token.email.endsWith('@ntua.gr') || auth.token.email.endsWith('.ntua.gr')) && (root.child('approved').child(auth.token.email.replace('.', ',')).exists() || root.child('admins').child(auth.token.email.replace('.', ',')).exists()) && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && data.child('ts').val() - now > 172800000))",
+          ".write": "auth != null && (root.child('admins').child(auth.token.email.replace('.', ',')).exists() || (auth.token.email_verified === true && (auth.token.email.endsWith('@ntua.gr') || auth.token.email.endsWith('.ntua.gr')) && root.child('approved').child(auth.token.email.replace('.', ',')).exists())) && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && data.child('ts').val() - now > 172800000))",
           ".validate": "newData.hasChildren(['name', 'start', 'code', 'ts']) && newData.child('ts').val() > now"
         }
       }
@@ -67,17 +68,18 @@
 Με απλά λόγια: κρατήσεις διαβάζουν/γράφουν **μόνο** συνδεδεμένοι, εγκεκριμένοι χρήστες ΕΜΠ (με τους ίδιους περιορισμούς όπως πριν: δημιουργία μόνο σε ελεύθερο slot, ακύρωση μόνο όσο απομένουν πάνω από 2 μέρες — το `172800000` = μέρες × 86400000). Αίτημα πρόσβασης μπορεί να υποβάλει οποιοσδήποτε (μία φορά ανά email, με υποχρεωτικό όνομα και έγκυρη διεύθυνση ΕΜΠ), αλλά τα αιτήματα τα βλέπει και τα διαχειρίζεται μόνο διαχειριστής, και εγκρίσεις γράφει μόνο διαχειριστής. Στους κόμβους `admins`/`approved` δεν γράφει κανείς μέσω σελίδας εκτός των παραπάνω — τους διαχειρίζεσαι από την κονσόλα.
 
 4. **Build → Authentication → Get started → Sign-in method**: πρόσθεσε τον πάροχο **Email/Password** και ενεργοποίησε ΚΑΙ τον διακόπτη **Email link (passwordless sign-in)** → Save.
-5. **Authentication → Settings → Authorized domains**: πάτα **Add domain** και πρόσθεσε το domain της σελίδας σου, π.χ. `ΤΟ-USERNAME-ΣΟΥ.github.io`. Χωρίς αυτό, η αποστολή συνδέσμων αποτυγχάνει.
-6. **Όρισε τον εαυτό σου διαχειριστή**: στο Realtime Database → Data, πρόσθεσε χειροκίνητα κόμβο `admins` και μέσα του ένα κλειδί με το email σου **με κόμματα αντί για τελείες** και τιμή `true`. Παράδειγμα για το `maria@central.ntua.gr`:
+5. **Φτιάξε τον λογαριασμό διαχειριστή με κωδικό**: Authentication → καρτέλα **Users** → **Add user** → βάλε το email σου και όρισε έναν κωδικό. Με αυτά τα δύο θα συνδέεσαι απευθείας στο `admin.html`. Κάνε το αμέσως μετά τη δημιουργία του project, ώστε το email σου να είναι «πιασμένο» πριν ανοίξει η σελίδα στον κόσμο.
+6. **Authentication → Settings → Authorized domains**: πάτα **Add domain** και πρόσθεσε το domain της σελίδας σου, π.χ. `ΤΟ-USERNAME-ΣΟΥ.github.io`. Χωρίς αυτό, δεν φεύγουν τα email σύνδεσης προς τους χρήστες.
+7. **Όρισε τον εαυτό σου διαχειριστή**: στο Realtime Database → Data, πρόσθεσε χειροκίνητα κόμβο `admins` και μέσα του ένα κλειδί με το ίδιο email **με κόμματα αντί για τελείες** και τιμή `true`. Παράδειγμα για το `maria@central.ntua.gr`:
 
 ```
 admins
   └─ maria@central,ntua,gr : true
 ```
 
-(Τα κλειδιά της βάσης δεν επιτρέπουν τελείες — γι' αυτό οι σελίδες και οι κανόνες χρησιμοποιούν παντού αυτή τη μετατροπή.) Οι διαχειριστές έχουν αυτόματα και πρόσβαση χρήστη, χωρίς ξεχωριστή έγκριση.
+(Τα κλειδιά της βάσης δεν επιτρέπουν τελείες — γι' αυτό οι σελίδες και οι κανόνες χρησιμοποιούν παντού αυτή τη μετατροπή.) Οι διαχειριστές έχουν αυτόματα και πρόσβαση χρήστη, χωρίς ξεχωριστή έγκριση, και δεν χρειάζονται συνδέσμους email — μπαίνουν με τον κωδικό τους.
 
-7. **Project settings** (γρανάζι) → **Your apps** → εικονίδιο **`</>`** (Web) → Register app. Αντέγραψε τις τιμές του `firebaseConfig` στο τμήμα `"firebase"` του `config.json`. Πρόσεξε το `databaseURL` — αν δεν εμφανίζεται εκεί, θα το βρεις στη σελίδα του Realtime Database. (Τα στοιχεία αυτά είναι σχεδιασμένα για δημόσιες σελίδες — την προστασία την κάνουν οι κανόνες και η έγκριση.)
+8. **Project settings** (γρανάζι) → **Your apps** → εικονίδιο **`</>`** (Web) → Register app. Αντέγραψε τις τιμές του `firebaseConfig` στο τμήμα `"firebase"` του `config.json`. Πρόσεξε το `databaseURL` — αν δεν εμφανίζεται εκεί, θα το βρεις στη σελίδα του Realtime Database. (Τα στοιχεία αυτά είναι σχεδιασμένα για δημόσιες σελίδες — την προστασία την κάνουν οι κανόνες και η έγκριση.)
 
 ## Βήμα 2 — GitHub Pages
 

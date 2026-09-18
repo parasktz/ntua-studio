@@ -67,6 +67,14 @@
   tr.new-day td{ border-top:2px solid var(--line); }
   .count{ color:var(--muted); font-size:.9rem; }
   .hint{ color:var(--muted); margin-top:20px; font-size:.88rem; max-width:70ch; }
+  .login-panel{ max-width:440px; }
+  .login-panel input{ width:100%; padding:10px 12px; border-radius:var(--radius);
+    border:1px solid var(--line); background:var(--bg); color:var(--text);
+    font-family:inherit; font-size:.95rem; margin:4px 0 12px; }
+  .login-panel input:focus-visible{ outline:2px solid var(--text); outline-offset:2px; }
+  .login-panel .btn{ width:100%; padding:11px; font-weight:700; }
+  .msg{ margin-top:12px; padding:10px 12px; border-radius:var(--radius); font-size:.9rem; display:none; }
+  .msg.err{ display:block; background:#2C1D1C; border:1px solid var(--rec); }
   @media (max-width:640px){
     .hide-sm{ display:none; }
   }
@@ -80,6 +88,22 @@
     <span class="userbar" id="userBox"></span>
   </header>
 
+  <!-- Είσοδος διαχειριστή: email + κωδικός (ο κωδικός ορίζεται στο Firebase Console) -->
+  <section class="block-panel login-panel" id="loginPanel" aria-label="Είσοδος διαχειριστή">
+    <h2>Είσοδος διαχειριστή</h2>
+    <p class="sub">Συνδέσου με το email διαχειριστή και τον κωδικό που έχεις ορίσει στο Firebase
+    (Authentication → Users → Add user). Οι απλοί χρήστες συνδέονται από τη σελίδα login.html.</p>
+    <form id="adminLoginForm" novalidate>
+      <label class="sub" for="adminEmail">Email</label>
+      <input id="adminEmail" type="email" autocomplete="username">
+      <label class="sub" for="adminPass">Κωδικός</label>
+      <input id="adminPass" type="password" autocomplete="current-password">
+      <button class="btn btn-rec" id="adminLoginBtn" type="submit">Σύνδεση</button>
+      <div class="msg" id="adminLoginMsg" role="status"></div>
+    </form>
+  </section>
+
+  <div id="adminApp" style="display:none">
   <section class="block-panel" aria-label="Αιτήματα πρόσβασης">
     <h2>Αιτήματα πρόσβασης</h2>
     <p class="sub">Νέοι χρήστες κάνουν αίτημα από τη σελίδα σύνδεσης με ονοματεπώνυμο και email ΕΜΠ.
@@ -124,13 +148,16 @@
   έως το όριο ημερών που ορίζει το config. Πέρα από αυτό, διαγραφές και διορθώσεις κρατήσεων γίνονται
   μόνο από την κονσόλα του Firebase (Realtime Database → κόμβος <span class="mono">bookings</span>).
   Τα «Μη διαθέσιμα» slots ξεκλειδώνουν από εδώ με ένα κλικ, όσο απέχουν πάνω από το ίδιο όριο.</p>
+  </div><!-- /adminApp -->
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getDatabase, ref, onValue, runTransaction, remove, set }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-import { requireAuth, signOut as fbSignOut, isAdmin, sendLoginLink } from "./auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword }
+  from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { signOut as fbSignOut, isAdmin, sendLoginLink } from "./auth.js";
 
 const $ = id => document.getElementById(id);
 const MONTHS = ["Ιαν","Φεβ","Μαρ","Απρ","Μαΐ","Ιουν","Ιουλ","Αυγ","Σεπ","Οκτ","Νοε","Δεκ"];
@@ -342,22 +369,58 @@ async function init(){
   if (!config.firebase || /ΒΑΛΕ/.test(config.firebase.apiKey || "")){
     $("rows").innerHTML = "<tr><td colspan='5'>Δεν έχει ρυθμιστεί το Firebase στο config.json.</td></tr>"; return;
   }
-  const app = initializeApp(config.firebase);
-  /* Απαιτείται σύνδεση ΚΑΙ ρόλος διαχειριστή (κόμβος admins στη βάση) */
-  requireAuth(app, async (user, auth) => {
-    if (db) return;                       // προστασία από διπλή εκκίνηση
-    currentUser = user; authRef = auth;
+  const app  = initializeApp(config.firebase);
+  const auth = getAuth(app);
+  authRef = auth;
+
+  const loginMsg = (kind, text) => {
+    const m = $("adminLoginMsg");
+    m.className = kind ? `msg ${kind}` : "msg";
+    m.textContent = text;
+  };
+
+  /* Είσοδος διαχειριστή με email + κωδικό (ο κωδικός ορίζεται στο Firebase Console) */
+  $("adminLoginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("adminEmail").value.trim().toLowerCase();
+    const pass  = $("adminPass").value;
+    if (!email || !pass) return loginMsg("err", "Συμπλήρωσε email και κωδικό.");
+    $("adminLoginBtn").disabled = true;
+    try{
+      await signInWithEmailAndPassword(auth, email, pass);
+      loginMsg("", "");
+    }catch(err){
+      loginMsg("err", ({
+        "auth/user-not-found": "Δεν υπάρχει χρήστης με αυτό το email — δημιούργησέ τον στο Firebase: Authentication → Users → Add user.",
+        "auth/wrong-password": "Λάθος κωδικός.",
+        "auth/invalid-credential": "Λάθος email ή κωδικός.",
+        "auth/too-many-requests": "Πολλές αποτυχημένες προσπάθειες — δοκίμασε ξανά σε λίγα λεπτά."
+      })[err.code] || "Η σύνδεση απέτυχε. Έλεγξε email και κωδικό.");
+    }
+    $("adminLoginBtn").disabled = false;
+  });
+
+  /* Με τη σύνδεση: έλεγχος ρόλου διαχειριστή και εκκίνηση της σελίδας */
+  onAuthStateChanged(auth, async user => {
+    if (!user){
+      $("adminApp").style.display = "none";
+      $("loginPanel").style.display = "";
+      $("userBox").innerHTML = "";
+      return;
+    }
+    if (!(await isAdmin(app, user.email))){
+      loginMsg("err", "Ο λογαριασμός αυτός δεν είναι διαχειριστής — λείπει από τον κόμβο admins της βάσης (δες README, βήμα «Όρισε τον εαυτό σου διαχειριστή»).");
+      await fbSignOut(auth);
+      return;
+    }
+    currentUser = user;
+    $("loginPanel").style.display = "none";
+    $("adminApp").style.display = "";
     $("userBox").innerHTML =
       `${user.email} · <button type="button" class="linkish" id="logoutBtn">Αποσύνδεση</button>`;
     $("logoutBtn").addEventListener("click", () => fbSignOut(auth));
 
-    if (!(await isAdmin(app, user.email))){
-      document.querySelector(".wrap").innerHTML =
-        `<p>Η σελίδα διαχείρισης είναι διαθέσιμη μόνο σε διαχειριστές.
-         <a href="index.html" style="color:var(--text)">Επιστροφή στις κρατήσεις</a></p>`;
-      return;
-    }
-
+    if (db) return;                       // προστασία από διπλή εκκίνηση των listeners
     db = getDatabase(app);
     onValue(ref(db, "bookings"), snap => {
       raw = snap.val() || {};
