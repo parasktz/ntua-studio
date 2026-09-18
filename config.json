@@ -1,0 +1,34 @@
+{
+  "title": "NTUA STUDIO",
+  "subtitle": "Χρονοπρογραμματισμός βιντεοσκόπησης",
+  "notes": "Επιλέξτε ημερομηνία και ένα ή περισσότερα διαθέσιμα slots. Η κράτηση όλων γίνεται με μία υποβολή.",
+
+  "dateRange": { "start": "2026-10-01", "end": "2026-12-10" },
+
+  "openWeekdays": [1, 2, 3, 4, 5],
+
+  "excludedDates": ["2026-10-28", "2026-11-17"],
+
+  "hours": { "start": "09:00", "end": "17:00" },
+  "slotMinutes": 60,
+
+  "maxSlotsPerBooking": 3,
+  "editDaysBefore": 2,
+
+  "dateOverrides": {},
+
+  "fields": {
+    "email": { "show": true, "required": false },
+    "phone": { "show": true, "required": false }
+  },
+
+  "firebase": {
+    "apiKey": "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
+    "authDomain": "ntua-studio.firebaseapp.com",
+    "databaseURL": "https://ntua-studio-default-rtdb.europe-west1.firebasedatabase.app",
+    "projectId": "ntua-studio",
+    "storageBucket": "ntua-studio.firebasestorage.app",
+    "messagingSenderId": "310321089066",
+    "appId": "1:310321089066:web:9b46d1fe8db08ae879d153"
+  }
+}
