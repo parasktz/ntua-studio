@@ -3,15 +3,24 @@
    Το αρχείο αυτό φορτώνεται από όλες τις σελίδες.
    ===================================================================== */
 
-const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
+  authDomain: "ntua-studio.firebaseapp.com",
+  databaseURL: "https://ntua-studio-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "ntua-studio",
+  storageBucket: "ntua-studio.firebasestorage.app",
+  messagingSenderId: "310321089066",
+  appId: "1:310321089066:web:9b46d1fe8db08ae879d153"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
    email), Αν μείνει κενό,
