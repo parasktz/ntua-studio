@@ -12,7 +12,7 @@
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης ΕΜΠ</div>
+  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
   <div class="session-title" id="topSessionTitle"></div>
   <div class="spacer"></div>
   <nav>
@@ -34,8 +34,10 @@
       <input type="password" id="admPass" required autocomplete="current-password">
       <div class="btn-row">
         <button class="btn" type="submit">Σύνδεση</button>
+        <button class="btn secondary" type="button" id="btnAdmForgot">Ξέχασα τον κωδικό</button>
         <button class="btn secondary" type="button" onclick="location.href='index.html'">Πίσω</button>
       </div>
+      <p class="hint" style="margin-top:14px">Ο λογαριασμός διαχειριστή δημιουργείται στην κονσόλα Firebase (<strong>Authentication → Users → Add user</strong>) και αποκτά δικαιώματα με την καταχώρηση του UID του στον κόμβο <code>admins</code> της βάσης (README, βήμα 1). Αν δεν θυμάστε τον κωδικό, πατήστε «Ξέχασα τον κωδικό» για να λάβετε email ορισμού νέου από το Firebase.</p>
     </form>
   </div>
 </main>
@@ -53,6 +55,15 @@ const isAdmin = async uid => !!(await db.ref("admins/" + uid).get()).val();
 /* Αν είναι ήδη συνδεδεμένος διαχειριστής, μετάβαση στον πίνακα */
 auth.onAuthStateChanged(async u => {
   if (u && await isAdmin(u.uid)) location.href = "admin.html";
+});
+
+$("btnAdmForgot").addEventListener("click", async () => {
+  const email = normEmail($("admEmail").value);
+  if (!email) { toast("Συμπληρώστε πρώτα το email διαχειριστή.", true); return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    toast("Στάλθηκε email ορισμού/επαναφοράς κωδικού από το Firebase — ανοίξτε τον σύνδεσμο και ορίστε νέο κωδικό.");
+  } catch (e) { toast("Αποτυχία αποστολής email επαναφοράς.", true); }
 });
 
 $("formLogin").addEventListener("submit", async e => {

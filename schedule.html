@@ -12,7 +12,7 @@
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης ΕΜΠ</div>
+  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
   <div class="session-title" id="topSessionTitle"></div>
   <div class="spacer"></div>
   <nav>
@@ -84,7 +84,18 @@
 <script>
 let me = null;   // συνδεδεμένος χρήστης (firebase user)
 
-auth.onAuthStateChanged(u => { me = u; render(); });
+auth.onAuthStateChanged(async u => {
+  me = u;
+  /* Αν συνδεθεί διαχειριστής εδώ, μεταφέρεται στον πίνακα διαχείρισης,
+     όπου γίνεται όλη η διαχείριση slots (κλειστά slots + κρατήσεις όλων) */
+  if (u) {
+    try {
+      const isAdm = !!(await db.ref("admins/" + u.uid).get()).val();
+      if (isAdm) { location.href = "admin.html"; return; }
+    } catch (e) {}
+  }
+  render();
+});
 watchData(render);
 
 function myRequests() {

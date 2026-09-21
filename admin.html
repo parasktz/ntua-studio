@@ -12,7 +12,7 @@
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης ΕΜΠ</div>
+  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
   <div class="session-title" id="topSessionTitle"></div>
   <div class="spacer"></div>
   <span class="who" id="topWho"></span>
@@ -67,7 +67,7 @@
   <section id="tab-calendar" class="hidden">
     <div class="card">
       <h2>Διαθεσιμότητα studio</h2>
-      <p class="hint" style="margin-bottom:14px">Κάντε κλικ σε ένα κενό slot για να το ορίσετε ως <strong>μη διαθέσιμο</strong> (κλειστό studio) και ξανά κλικ για να το ανοίξετε. Κλικ σε κράτηση χρήστη για προβολή/επεξεργασία. Για νέα κράτηση εκ μέρους χρήστη, επιλέξτε πρώτα χρήστη:</p>
+      <p class="hint" style="margin-bottom:14px">Κάντε κλικ σε ένα κενό slot για να το ορίσετε ως <strong>μη διαθέσιμο</strong> (κλειστό studio) και ξανά κλικ για να το ανοίξετε. Κλικ σε κράτηση χρήστη για προβολή/επεξεργασία ή διαγραφή. Για νέα κράτηση — δική σας ή εκ μέρους χρήστη — επιλέξτε πρώτα από τη λίστα:</p>
       <label for="admAssign">Ανάθεση κράτησης σε χρήστη</label>
       <select id="admAssign"><option value="">— Λειτουργία διαθεσιμότητας (κλείσιμο slots) —</option></select>
       <div style="margin-top:16px" id="adminCal"></div>
@@ -183,7 +183,9 @@ $("formConfig").addEventListener("submit", async e => {
 /* ---------- Ημερολόγιο: μη διαθέσιμα slots & όλες οι κρατήσεις ---------- */
 function renderAdminCalendar() {
   const sel = $("admAssign"), prev = sel.value;
+  const meEmail = auth.currentUser ? normEmail(auth.currentUser.email) : "";
   sel.innerHTML = '<option value="">— Λειτουργία διαθεσιμότητας (κλείσιμο slots) —</option>' +
+    (meEmail ? `<option value="${esc(meEmail)}">Διαχειριστής (εγώ) · ${esc(meEmail)}</option>` : "") +
     approvedUsers().map(u => `<option value="${esc(u.email)}">${esc(u.name)} · ${esc(u.email)}</option>`).join("");
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
   buildCalendar("adminCal", "admin", null, adminCellClick);
@@ -211,19 +213,22 @@ async function adminCellClick(date, hour) {
   if (userHoursOn(assignTo, date) >= MAX_HOURS_PER_DATE) {
     toast(`Ο χρήστης έχει ήδη ${MAX_HOURS_PER_DATE} ώρες στις ${fmtDate(date)}.`, true); return;
   }
+  const meEmail = auth.currentUser ? normEmail(auth.currentUser.email) : "";
+  const isSelf = normEmail(assignTo) === meEmail;
   const u = approvedUsers().find(x => normEmail(x.email) === normEmail(assignTo));
+  const uname = u ? u.name : (isSelf ? "Διαχειριστής" : "");
   openModal({
-    title: "Νέα κράτηση για χρήστη",
-    meta: `${u?.name || assignTo} · ${fmtDate(date)} · ${fmtHour(hour)}`,
+    title: isSelf ? "Νέα κράτηση (διαχειριστής)" : "Νέα κράτηση για χρήστη",
+    meta: `${uname || assignTo} · ${fmtDate(date)} · ${fmtHour(hour)}`,
     bodyHTML: `<label for="mDesc">Περιγραφή εργασίας</label><textarea id="mDesc"></textarea>`,
     buttons: [
       { label: "Άκυρο" },
       { label: "Καταχώρηση", kind: "", onClick: async () => {
           await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).set({
-            email: normEmail(assignTo), name: u?.name || "", desc: $("mDesc").value.trim(), updatedAt: Date.now()
+            email: normEmail(assignTo), name: uname, desc: $("mDesc").value.trim(), updatedAt: Date.now()
           });
           toast("Η κράτηση καταχωρήθηκε.");
-          queueChangeEmail(assignTo);
+          if (!isSelf) queueChangeEmail(assignTo);
         } }
     ]
   });
@@ -242,12 +247,12 @@ function adminBookingModal(date, hour, b) {
       { label: "Διαγραφή", kind: "danger", onClick: async () => {
           await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).remove();
           toast("Η κράτηση διαγράφηκε.");
-          queueChangeEmail(b.email);
+          if (normEmail(b.email) !== normEmail(auth.currentUser?.email)) queueChangeEmail(b.email);
         } },
       { label: "Αποθήκευση", kind: "", onClick: async () => {
           await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).update({ desc: $("mDesc").value.trim(), updatedAt: Date.now() });
           toast("Η κράτηση ενημερώθηκε.");
-          queueChangeEmail(b.email);
+          if (normEmail(b.email) !== normEmail(auth.currentUser?.email)) queueChangeEmail(b.email);
         } }
     ]
   });
