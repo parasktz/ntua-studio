@@ -10,6 +10,30 @@
 <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
+<script>
+/* Δίχτυ διάγνωσης: αν κάποιο αρχείο δεν φορτωθεί ή κάποιο script σπάσει,
+   εμφανίζεται κόκκινο πλαίσιο με τη συγκεκριμένη αιτία, αντί η σελίδα
+   να μένει σιωπηλά "νεκρή". */
+window.addEventListener("error", function (e) {
+  var msg;
+  if (e && e.target && e.target !== window && (e.target.tagName === "SCRIPT" || e.target.tagName === "LINK")) {
+    msg = "Δεν φορτώθηκε το αρχείο: " + (e.target.src || e.target.href) + " (ελέγξτε ότι ανέβηκε και ο φάκελος assets)";
+  } else if (e && e.message) {
+    msg = e.message + (e.filename ? " — " + e.filename.split("/").pop() + (e.lineno ? ":" + e.lineno : "") : "") +
+          " (πιθανό συντακτικό λάθος στο assets/config.js από την επεξεργασία)";
+  } else return;
+  var d = document.getElementById("bootErr");
+  if (!d) {
+    d = document.createElement("div");
+    d.id = "bootErr";
+    d.style.cssText = "background:#FCE9E9;color:#C22F2F;padding:12px 18px;font:600 14px/1.5 Arial,sans-serif;white-space:pre-wrap;";
+    d.textContent = "Σφάλμα φόρτωσης σελίδας — η φόρμα δεν θα λειτουργήσει μέχρι να διορθωθεί:";
+    var add = function(){ document.body.insertBefore(d, document.body.firstChild); };
+    document.body ? add() : document.addEventListener("DOMContentLoaded", add);
+  }
+  d.textContent += "\n• " + msg;
+}, true);
+</script>
 
 <header class="topbar">
   <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
