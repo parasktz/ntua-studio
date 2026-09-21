@@ -12,7 +12,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "310321089066",
   appId: "1:310321089066:web:9b46d1fe8db08ae879d153"
 };
-
+ALLOWED_EMAIL_DOMAINS = ["ntua.gr"]
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
    email), π.χ. "https://studio.ntua.gr/booking/". Αν μείνει κενό,
    χρησιμοποιείται αυτόματα η τρέχουσα διεύθυνση. */
