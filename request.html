@@ -60,7 +60,7 @@ window.addEventListener("error", function (e) {
       <input type="text" id="reqName" required autocomplete="name">
       <label for="reqEmail">Ιδρυματικό email (ntua.gr)</label>
       <input type="email" id="reqEmail" required autocomplete="email" placeholder="onoma@mail.ntua.gr">
-      <label for="reqDept">Τμήμα / Μονάδα</label>
+      <label for="reqDept">Σχολή/Τομέας/Εργαστήριο</label>
       <input type="text" id="reqDept">
       <label for="reqNotes">Περιγραφή αιτήματος</label>
       <textarea id="reqNotes" placeholder="Τι θέλετε να βιντεοσκοπήσετε, εκτιμώμενη διάρκεια κ.λπ."></textarea>
@@ -101,7 +101,7 @@ $("formRequest").addEventListener("submit", async e => {
   if (!isAllowedEmail(email)) {
     const m = $("reqMsg");
     m.className = "msg-err";
-    m.textContent = `Η εγγραφή δεν είναι δυνατή με το «${email}»: επιτρέπεται μόνο σε όσους διαθέτουν ιδρυματικά credentials του ΕΜΠ, δηλαδή email που ανήκει στο ntua.gr (π.χ. onoma@mail.ntua.gr). Αν ανήκετε στο ίδρυμα, χρησιμοποιήστε το ιδρυματικό σας email.`;
+    m.textContent = `Η εγγραφή δεν είναι δυνατή με το «${email}»: επιτρέπεται μόνο σε όσους διαθέτουν ΕΜΠ email `;
     toast("Επιτρέπονται μόνο ιδρυματικά email ntua.gr.", true);
     return;
   }
@@ -126,7 +126,7 @@ $("formRequest").addEventListener("submit", async e => {
         ? " Σας στάλθηκε email για να ορίσετε τον προσωπικό σας κωδικό εισόδου (ελέγξτε και τα ανεπιθύμητα). Ο σύνδεσμος ορισμού είναι μίας χρήσης — ο κωδικός που θα ορίσετε δεν λήγει ποτέ. Θα ενημερωθείτε ξανά όταν εγκριθεί το αίτημα."
         : acc === "exists"
         ? " Υπάρχει ήδη λογαριασμός με αυτό το email — ισχύει ο κωδικός που είχατε ορίσει. Αν τον ξεχάσατε, πατήστε «Ξέχασα τον κωδικό» στη σελίδα χρονοπρογραμματισμού."
-        : " Η αποστολή του email ορισμού κωδικού απέτυχε — μπορείτε να το λάβετε αργότερα με το «Ξέχασα τον κωδικό» στη σελίδα χρονοπρογραμματισμού."
+        : " Η αποστολή του email με τον κωδικό απέτυχε — μπορείτε να το λάβετε αργότερα με το «Ξέχασα τον κωδικό» στη σελίδα χρονοπρογραμματισμού."
     );
     toast("Το αίτημα υποβλήθηκε.");
   } catch (err) { toast("Σφάλμα κατά την υποβολή. Δοκιμάστε ξανά.", true); }
