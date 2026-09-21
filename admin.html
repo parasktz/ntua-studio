@@ -111,8 +111,15 @@ window.addEventListener("error", function (e) {
 
   <section id="tab-users" class="hidden">
     <div class="card">
-      <h2>Εγκεκριμένοι χρήστες &amp; κρατήσεις τους</h2>
-      <div id="usersList"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <h2 style="margin-bottom:0">Εγκεκριμένοι χρήστες &amp; κρατήσεις τους</h2>
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn secondary small" type="button" id="btnExportCSV">Λήψη κρατήσεων (CSV)</button>
+          <button class="btn secondary small" type="button" id="btnExportICS">Λήψη ημερολογίου (.ics)</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:6px">Το CSV περιέχει όλες τις τρέχουσες κρατήσεις (χρήστης, email, ημερομηνία, ώρα, περιγραφή) και ανοίγει σε Excel. Το .ics περιέχει όλες τις κρατήσεις ως εγγραφές ημερολογίου.</p>
+      <div id="usersList" style="margin-top:14px"></div>
     </div>
   </section>
 </main>
@@ -372,6 +379,109 @@ function renderUsersList() {
       </div>`;
   }).join("");
 }
+
+/* =====================================================================
+   ΕΞΑΓΩΓΗ ΟΛΩΝ ΤΩΝ ΚΡΑΤΗΣΕΩΝ (admin)
+   ===================================================================== */
+/* Όλες οι τρέχουσες κρατήσεις, ταξινομημένες ανά ημερομηνία/ώρα */
+function allBookings() {
+  const out = [];
+  for (const [date, hrs] of Object.entries(S.bookings || {}))
+    for (const [h, b] of Object.entries(hrs || {}))
+      out.push({ date, hour: +h, name: b.name || "", email: b.email || "", desc: b.desc || "" });
+  out.sort((a, b) => a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date));
+  return out;
+}
+
+function downloadBlob(filename, text, mime) {
+  const blob = new Blob(["\uFEFF" + text], { type: mime + ";charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+const csvCell = v => {
+  const s = String(v ?? "");
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+};
+
+function exportCSV() {
+  const rows = allBookings();
+  if (!rows.length) { toast("Δεν υπάρχουν κρατήσεις για εξαγωγή.", true); return; }
+  const header = ["Ονοματεπώνυμο", "Email", "Ημερομηνία", "Ημέρα", "Από", "Έως", "Περιγραφή εργασίας", "Session"];
+  const lines = [header.map(csvCell).join(",")];
+  rows.forEach(r => {
+    lines.push([
+      r.name, r.email, fmtDate(r.date), dayName(r.date),
+      `${pad(r.hour)}:00`, `${pad(r.hour + 1)}:00`, r.desc, S.session ? S.session.title : ""
+    ].map(csvCell).join(","));
+  });
+  const stamp = todayStr().replace(/-/g, "");
+  downloadBlob(`kratiseis-studio-${stamp}.csv`, lines.join("\r\n"), "text/csv");
+  toast(`Λήφθηκαν ${rows.length} κρατήσεις (CSV).`);
+}
+
+/* Ενοποίηση διαδοχικών ωρών ανά χρήστη+ημέρα σε ένα event */
+function allEvents() {
+  const rows = allBookings();
+  const byKey = {};
+  rows.forEach(r => { (byKey[r.email + "|" + r.date] = byKey[r.email + "|" + r.date] || []).push(r); });
+  const events = [];
+  Object.values(byKey).forEach(list => {
+    list.sort((a, b) => a.hour - b.hour);
+    let cur = null;
+    list.forEach(r => {
+      if (cur && r.hour === cur.endHour) {
+        cur.endHour = r.hour + 1;
+        if (r.desc && cur.descs.indexOf(r.desc) === -1) cur.descs.push(r.desc);
+      } else {
+        if (cur) events.push(cur);
+        cur = { date: r.date, startHour: r.hour, endHour: r.hour + 1, name: r.name, email: r.email, descs: r.desc ? [r.desc] : [] };
+      }
+    });
+    if (cur) events.push(cur);
+  });
+  events.sort((a, b) => a.date === b.date ? a.startHour - b.startHour : a.date.localeCompare(b.date));
+  return events;
+}
+
+const icsEsc = t => String(t).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+function calStamp(dateStr, hour) { return dateStr.replace(/-/g, "") + "T" + pad(hour) + "0000"; }
+function calStampUTC(d) {
+  return d.getUTCFullYear() + pad(d.getUTCMonth()+1) + pad(d.getUTCDate()) + "T" +
+         pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + "Z";
+}
+
+function exportICS() {
+  const events = allEvents();
+  if (!events.length) { toast("Δεν υπάρχουν κρατήσεις για εξαγωγή.", true); return; }
+  const now = calStampUTC(new Date());
+  let out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//NTUA Studio//Booking//EL", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  events.forEach((e, i) => {
+    out.push("BEGIN:VEVENT");
+    out.push("UID:" + e.date.replace(/-/g, "") + "-" + pad(e.startHour) + "-" + i + "@ntua-studio");
+    out.push("DTSTAMP:" + now);
+    out.push("DTSTART:" + calStamp(e.date, e.startHour));
+    out.push("DTEND:" + calStamp(e.date, e.endHour));
+    out.push("SUMMARY:" + icsEsc(`Βιντεοσκόπηση Studio ΕΜΠ — ${e.name || e.email}`));
+    out.push("LOCATION:Studio ΕΜΠ");
+    const d = [e.email, e.descs.join(" · ")].filter(Boolean).join(" — ");
+    if (d) out.push("DESCRIPTION:" + icsEsc(d));
+    out.push("END:VEVENT");
+  });
+  out.push("END:VCALENDAR");
+  const stamp = todayStr().replace(/-/g, "");
+  downloadBlob(`kratiseis-studio-${stamp}.ics`, out.join("\r\n"), "text/calendar");
+  toast(`Λήφθηκε ημερολόγιο με ${events.length} εγγραφές (.ics).`);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const c = $("btnExportCSV"), i = $("btnExportICS");
+  if (c) c.addEventListener("click", exportCSV);
+  if (i) i.addEventListener("click", exportICS);
+});
 </script>
 </body>
 </html>
