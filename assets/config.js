@@ -14,9 +14,9 @@ const FIREBASE_CONFIG = {
 };
 
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
-   email), π.χ. "https://studio.uniwa.gr/booking/". Αν μείνει κενό,
+   email), Αν μείνει κενό,
    χρησιμοποιείται αυτόματα η τρέχουσα διεύθυνση. */
-const APP_URL = "";
+const APP_URL = "https://parasktz.github.io/ntua-studio/";
 
 /* Επιτρεπόμενα domains ιδρυματικού email για τη φόρμα αίτησης.
    Γίνονται δεκτά και όλα τα subdomains (π.χ. mail.ntua.gr,
