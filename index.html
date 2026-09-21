@@ -19,8 +19,11 @@ window.addEventListener("error", function (e) {
   if (e && e.target && e.target !== window && (e.target.tagName === "SCRIPT" || e.target.tagName === "LINK")) {
     msg = "Δεν φορτώθηκε το αρχείο: " + (e.target.src || e.target.href) + " (ελέγξτε ότι ανέβηκε και ο φάκελος assets)";
   } else if (e && e.message) {
-    msg = e.message + (e.filename ? " — " + e.filename.split("/").pop() + (e.lineno ? ":" + e.lineno : "") : "") +
-          " (πιθανό συντακτικό λάθος στο assets/config.js από την επεξεργασία)";
+    var file = e.filename ? e.filename.split("/").pop() : "";
+    var hint = /config\.js/.test(file) ? " (ελέγξτε το assets/config.js — τιμές Firebase)"
+             : file ? " (αρχείο: " + file + (e.lineno ? ":" + e.lineno : "") + ")"
+             : "";
+    msg = e.message + hint;
   } else return;
   var d = document.getElementById("bootErr");
   if (!d) {

@@ -19,8 +19,11 @@ window.addEventListener("error", function (e) {
   if (e && e.target && e.target !== window && (e.target.tagName === "SCRIPT" || e.target.tagName === "LINK")) {
     msg = "Δεν φορτώθηκε το αρχείο: " + (e.target.src || e.target.href) + " (ελέγξτε ότι ανέβηκε και ο φάκελος assets)";
   } else if (e && e.message) {
-    msg = e.message + (e.filename ? " — " + e.filename.split("/").pop() + (e.lineno ? ":" + e.lineno : "") : "") +
-          " (πιθανό συντακτικό λάθος στο assets/config.js από την επεξεργασία)";
+    var file = e.filename ? e.filename.split("/").pop() : "";
+    var hint = /config\.js/.test(file) ? " (ελέγξτε το assets/config.js — τιμές Firebase)"
+             : file ? " (αρχείο: " + file + (e.lineno ? ":" + e.lineno : "") + ")"
+             : "";
+    msg = e.message + hint;
   } else return;
   var d = document.getElementById("bootErr");
   if (!d) {
@@ -87,6 +90,16 @@ window.addEventListener("error", function (e) {
   <div class="card">
     <h2>Οι κρατήσεις μου</h2>
     <div id="mySlots"></div>
+    <div id="calExport" class="hidden" style="margin-top:16px;border-top:1px solid var(--line);padding-top:16px">
+      <label style="margin-top:0">Προσθήκη στο ημερολόγιό μου</label>
+      <p class="hint" style="margin-top:0;margin-bottom:10px">Οι διαδοχικές ώρες της ίδιας ημέρας ενοποιούνται σε μία εγγραφή.</p>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn secondary" type="button" id="btnGCal">Google Calendar</button>
+        <button class="btn secondary" type="button" id="btnICS">Apple / Mac Calendar (.ics)</button>
+        <button class="btn secondary" type="button" id="btnOutlook">Outlook Calendar</button>
+      </div>
+      <p class="hint" id="calExportHint" style="margin-top:10px"></p>
+    </div>
   </div>
 </main>
 
@@ -255,12 +268,137 @@ function userCellClick(date, hour) {
 function renderMySlots() {
   const box = $("mySlots");
   const slots = userSlots(me.email);
-  if (!slots.length) { box.innerHTML = '<p class="empty">Δεν έχετε κρατήσεις ακόμη — επιλέξτε slots στο ημερολόγιο.</p>'; return; }
+  if (!slots.length) {
+    box.innerHTML = '<p class="empty">Δεν έχετε κρατήσεις ακόμη — επιλέξτε slots στο ημερολόγιο.</p>';
+    $("calExport").classList.add("hidden");
+    return;
+  }
   box.innerHTML = `<ul class="slots-list">` + slots.map(s => {
     const locked = !userCanEditDate(s.date);
     return `<li><span class="mono">${fmtDate(s.date)} ${fmtHour(s.hour)}</span> — ${esc(s.desc || "")}${locked ? ' <span class="badge">κλειδωμένο</span>' : ""}</li>`;
   }).join("") + `</ul>`;
+  $("calExport").classList.remove("hidden");
 }
+
+/* =====================================================================
+   ΕΞΑΓΩΓΗ ΚΡΑΤΗΣΕΩΝ ΣΕ ΗΜΕΡΟΛΟΓΙΟ
+   Ενοποίηση διαδοχικών ωριαίων slots ίδιας ημέρας σε ένα event.
+   ===================================================================== */
+function myEvents() {
+  const slots = userSlots(me.email);          // ταξινομημένα ανά ημέρα/ώρα
+  const events = [];
+  let cur = null;
+  for (const s of slots) {
+    if (cur && s.date === cur.date && s.hour === cur.endHour) {
+      cur.endHour = s.hour + 1;
+      if (s.desc && cur.descs.indexOf(s.desc) === -1) cur.descs.push(s.desc);
+    } else {
+      if (cur) events.push(cur);
+      cur = { date: s.date, startHour: s.hour, endHour: s.hour + 1, descs: s.desc ? [s.desc] : [] };
+    }
+  }
+  if (cur) events.push(cur);
+  return events.map(e => ({
+    date: e.date, startHour: e.startHour, endHour: e.endHour,
+    title: `Βιντεοσκόπηση Studio ΕΜΠ${S.session ? " — " + S.session.title : ""}`,
+    location: "Studio ΕΜΠ",
+    desc: e.descs.join(" · ")
+  }));
+}
+
+/* Μορφή ημερομηνίας/ώρας χωρίς ζώνη (local): YYYYMMDDTHHMMSS */
+function calStamp(dateStr, hour) {
+  return dateStr.replace(/-/g, "") + "T" + pad(hour) + "0000";
+}
+function calStampUTC(d) {
+  return d.getUTCFullYear() + pad(d.getUTCMonth()+1) + pad(d.getUTCDate()) + "T" +
+         pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + "Z";
+}
+
+function buildICS(events) {
+  const now = calStampUTC(new Date());
+  let out = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//NTUA Studio//Booking//EL","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
+  events.forEach((e, i) => {
+    const uid = `${e.date.replace(/-/g,"")}-${pad(e.startHour)}-${i}@ntua-studio`;
+    out.push("BEGIN:VEVENT");
+    out.push("UID:" + uid);
+    out.push("DTSTAMP:" + now);
+    out.push("DTSTART:" + calStamp(e.date, e.startHour));
+    out.push("DTEND:" + calStamp(e.date, e.endHour));
+    out.push("SUMMARY:" + icsEsc(e.title));
+    if (e.location) out.push("LOCATION:" + icsEsc(e.location));
+    if (e.desc) out.push("DESCRIPTION:" + icsEsc(e.desc));
+    out.push("END:VEVENT");
+  });
+  out.push("END:VCALENDAR");
+  return out.join("\r\n");
+}
+const icsEsc = t => String(t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
+
+function downloadICS() {
+  const events = myEvents();
+  if (!events.length) return;
+  const blob = new Blob([buildICS(events)], { type: "text/calendar;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "kratiseis-studio.ics";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* Google/Outlook: μία εγγραφή ανά κλήση — αν υπάρχουν πολλές, ανοίγουν
+   διαδοχικά (με επιβεβαίωση), αλλιώς το .ics τις βάζει όλες μαζί. */
+function gcalUrl(e) {
+  const p = new URLSearchParams({
+    action: "TEMPLATE",
+    text: e.title,
+    dates: `${calStamp(e.date, e.startHour)}/${calStamp(e.date, e.endHour)}`,
+    location: e.location || "",
+    details: e.desc || ""
+  });
+  return "https://calendar.google.com/calendar/render?" + p.toString();
+}
+function outlookUrl(e) {
+  const iso = (dateStr, hour) => `${dateStr}T${pad(hour)}:00:00`;
+  const p = new URLSearchParams({
+    path: "/calendar/action/compose",
+    rru: "addevent",
+    subject: e.title,
+    startdt: iso(e.date, e.startHour),
+    enddt: iso(e.date, e.endHour),
+    location: e.location || "",
+    body: e.desc || ""
+  });
+  return "https://outlook.office.com/calendar/0/deeplink/compose?" + p.toString();
+}
+
+function openEventUrls(urlFn, label) {
+  const events = myEvents();
+  if (!events.length) return;
+  if (events.length > 1) {
+    const ok = confirm(`Έχετε ${events.length} χρονικές εγγραφές. Θα ανοίξουν ${events.length} καρτέλες ${label} (μία ανά εγγραφή). Για μία ενιαία εισαγωγή, χρησιμοποιήστε το κουμπί .ics. Συνέχεια;`);
+    if (!ok) return;
+  }
+  let opened = 0;
+  events.forEach((e, i) => {
+    setTimeout(() => { window.open(urlFn(e), "_blank", "noopener"); }, i * 400);
+    opened++;
+  });
+  const hint = $("calExportHint");
+  hint.textContent = opened > 1
+    ? `Άνοιξαν ${opened} καρτέλες — αν ο browser μπλόκαρε κάποια, επιτρέψτε τα pop-ups ή χρησιμοποιήστε το .ics.`
+    : "Άνοιξε η σελίδα δημιουργίας εγγραφής.";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const g = $("btnGCal"), ics = $("btnICS"), o = $("btnOutlook");
+  if (g) g.addEventListener("click", () => openEventUrls(gcalUrl, "Google Calendar"));
+  if (o) o.addEventListener("click", () => openEventUrls(outlookUrl, "Outlook"));
+  if (ics) ics.addEventListener("click", () => {
+    downloadICS();
+    $("calExportHint").textContent = "Κατέβηκε το αρχείο kratiseis-studio.ics — ανοίξτε το για εισαγωγή σε Apple/Mac Calendar, Outlook desktop ή οποιοδήποτε ημερολόγιο.";
+  });
+});
 </script>
 </body>
 </html>
