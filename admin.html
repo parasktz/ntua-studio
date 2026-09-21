@@ -77,7 +77,7 @@
   <section id="tab-requests" class="hidden">
     <div class="card">
       <h2>Αιτήματα βιντεοσκόπησης</h2>
-      <p class="hint" style="margin-bottom:6px">Με την έγκριση δημιουργείται λογαριασμός χρήστη στο Firebase και αποστέλλεται email με τον προσωπικό του κωδικό (χωρίς ημερομηνία λήξης) και τον σύνδεσμο χρονοπρογραμματισμού.</p>
+      <p class="hint" style="margin-bottom:6px">Με την έγκριση δημιουργείται λογαριασμός χρήστη στο Firebase και αποστέλλεται email επιβεβαίωσης με τον <strong>8ψήφιο κωδικό</strong> εισόδου (χωρίς ημερομηνία λήξης) και τον σύνδεσμο χρονοπρογραμματισμού. Email και κωδικός δεν εμφανίζονται ποτέ σε URL.</p>
       <div id="requestsList"></div>
     </div>
   </section>
@@ -255,13 +255,15 @@ function adminBookingModal(date, hour, b) {
 }
 
 /* ---------- Αιτήματα: έγκριση → λογαριασμός + email με κωδικό ---------- */
-function genPassword(len = 10) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+/* Κρυπτογραφικά τυχαίος 8ψήφιος κωδικός (crypto.getRandomValues).
+   Αποθηκεύεται ΜΟΝΟ κρυπτογραφημένος στο Firebase Authentication —
+   ποτέ στη βάση, ποτέ σε URL. */
+function genCode(len = 8) {
   const a = new Uint32Array(len);
   crypto.getRandomValues(a);
-  let p = "";
-  for (let i = 0; i < len; i++) p += chars[a[i] % chars.length];
-  return p;
+  let c = "";
+  for (let i = 0; i < len; i++) c += String(a[i] % 10);
+  return c;
 }
 
 /* Δεύτερη σύνδεση Firebase, ώστε η δημιουργία λογαριασμού χρήστη
@@ -323,10 +325,10 @@ function renderRequestsList() {
 
 async function approveRequest(id) {
   const r = S.requests[id];
-  const pass = genPassword();
+  const code = genCode(8);
   let created = false;
   try {
-    await secAuth().createUserWithEmailAndPassword(normEmail(r.email), pass);
+    await secAuth().createUserWithEmailAndPassword(normEmail(r.email), code);
     await secAuth().signOut();
     created = true;
   } catch (e) {
@@ -339,7 +341,7 @@ async function approveRequest(id) {
     status: "approved", decidedAt: Date.now(), account: created ? "created" : "existing"
   });
   if (created) {
-    sendApprovalEmail(r, pass);
+    sendApprovalEmail(r, code);
   } else {
     /* Ο λογαριασμός υπήρχε ήδη (π.χ. από προηγούμενο session) —
        αποστολή email επαναφοράς κωδικού από το ίδιο το Firebase (δωρεάν) */
@@ -349,11 +351,11 @@ async function approveRequest(id) {
   }
 }
 
-async function sendApprovalEmail(r, password) {
-  const link = scheduleLink(r.email);
+async function sendApprovalEmail(r, code) {
+  const link = scheduleLink();
   const subject = `Έγκριση αιτήματος βιντεοσκόπησης — ${S.session?.title || ""}`;
-  const credPart = password
-    ? `Στοιχεία εισόδου στη σελίδα χρονοπρογραμματισμού:\n  Σελίδα:  ${link}\n  Email:   ${normEmail(r.email)}\n  Κωδικός: ${password}\n\nΟ κωδικός δεν έχει ημερομηνία λήξης — μπορείτε να συνδεθείτε όποτε επιθυμείτε.`
+  const credPart = code
+    ? `Στοιχεία εισόδου στη σελίδα χρονοπρογραμματισμού:\n  Σελίδα: ${link}\n  Email:  ${normEmail(r.email)}\n  8ψήφιος κωδικός εισόδου: ${code}\n\nΣυνδέεστε με το email σας και τον παραπάνω κωδικό. Ο κωδικός δεν έχει ημερομηνία λήξης — η πρώτη σύνδεση μπορεί να γίνει όποτε επιθυμείτε. Φυλάξτε τον και μην τον κοινοποιείτε.`
     : `Σελίδα χρονοπρογραμματισμού: ${link}\nΟ λογαριασμός σας υπήρχε ήδη· θα λάβετε ξεχωριστό email από το Firebase για ορισμό νέου κωδικού.`;
   const body = `Αγαπητέ/ή ${r.name},\n\nΤο αίτημά σας για βιντεοσκόπηση εγκρίθηκε.\n\n${credPart}\n\nΠερίοδος: ${fmtDate(S.session.dateFrom)} – ${fmtDate(S.session.dateTo)}, ώρες ${pad(S.session.hourStart)}:00–${pad(S.session.hourEnd)}:00.\nΈως ${MAX_HOURS_PER_DATE} ώρες ανά ημέρα · αλλαγές έως ${LOCK_DAYS} ημέρα πριν από κάθε βιντεοσκόπηση.`;
   if (await sendMailAuto(r.email, subject, body)) {
@@ -361,11 +363,11 @@ async function sendApprovalEmail(r, password) {
     return;
   }
   /* Fallback χωρίς EmailJS: έτοιμο email στο πρόγραμμα αλληλογραφίας */
-  if (password) {
+  if (code) {
     openModal({
-      title: "Κωδικός χρήστη",
+      title: "8ψήφιος κωδικός χρήστη",
       meta: `${r.name} · ${normEmail(r.email)}`,
-      bodyHTML: `<p class="hint">Ο λογαριασμός δημιουργήθηκε. Ο κωδικός εμφανίζεται μόνο τώρα — στείλτε το email που θα ανοίξει:</p><div class="pwbox">${esc(password)}</div>`,
+      bodyHTML: `<p class="hint">Ο λογαριασμός δημιουργήθηκε. Ο κωδικός εμφανίζεται μόνο αυτή τη στιγμή (δεν αποθηκεύεται πουθενά) — στείλτε το email που θα ανοίξει:</p><div class="pwbox">${esc(code)}</div>`,
       buttons: [{ label: "Άνοιγμα email προς αποστολή", kind: "", onClick: () => mailFallback(r.email, subject, body) }]
     });
   } else {

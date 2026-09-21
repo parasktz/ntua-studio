@@ -26,14 +26,14 @@
 <!-- Είσοδος χρήστη -->
 <main class="wrap narrow" id="schedGate">
   <h1>Χρονοπρογραμματισμός βιντεοσκόπησης</h1>
-  <p class="sub">Συνδεθείτε με το ιδρυματικό σας email και τον κωδικό που λάβατε στο email έγκρισης. Ο κωδικός δεν έχει ημερομηνία λήξης.</p>
+  <p class="sub">Συνδεθείτε με το ιδρυματικό σας email και τον 8ψήφιο κωδικό που λάβατε στο email έγκρισης. Ο κωδικός δεν έχει ημερομηνία λήξης.</p>
   <div class="card">
     <div id="gateErr" class="msg-err hidden"></div>
     <form id="formGate">
       <label for="gateEmail">Ιδρυματικό email</label>
       <input type="email" id="gateEmail" required autocomplete="username">
-      <label for="gatePass">Κωδικός</label>
-      <input type="password" id="gatePass" required autocomplete="current-password">
+      <label for="gatePass">Κωδικός (8ψήφιος, από το email έγκρισης)</label>
+      <input type="password" id="gatePass" required autocomplete="current-password" placeholder="••••••••">
       <div class="btn-row">
         <button class="btn" type="submit">Σύνδεση</button>
         <button class="btn secondary" type="button" id="btnForgot">Ξέχασα τον κωδικό</button>
@@ -83,10 +83,6 @@
 <script src="assets/config.js"></script>
 <script src="assets/common.js"></script>
 <script>
-/* Προσυμπλήρωση email από τον σύνδεσμο του email έγκρισης (?email=...) */
-const preEmail = normEmail(new URLSearchParams(location.search).get("email"));
-if (preEmail) $("gateEmail").value = preEmail;
-
 let me = null;   // συνδεδεμένος χρήστης (firebase user)
 
 auth.onAuthStateChanged(u => { me = u; render(); });
@@ -136,7 +132,7 @@ $("formGate").addEventListener("submit", async e => {
   try {
     await auth.signInWithEmailAndPassword(normEmail($("gateEmail").value), $("gatePass").value);
   } catch (err) {
-    $("gateErr").textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός. Ο κωδικός σάς έχει σταλεί στο email έγκρισης.";
+    $("gateErr").textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός. Ο 8ψήφιος κωδικός σάς έχει σταλεί στο email έγκρισης.";
     $("gateErr").classList.remove("hidden");
   }
 });
