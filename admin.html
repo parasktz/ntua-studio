@@ -77,7 +77,7 @@
   <section id="tab-requests" class="hidden">
     <div class="card">
       <h2>Αιτήματα βιντεοσκόπησης</h2>
-      <p class="hint" style="margin-bottom:6px">Με την έγκριση δημιουργείται λογαριασμός χρήστη στο Firebase με <strong>8ψήφιο κωδικό</strong> εισόδου (χωρίς ημερομηνία λήξης) και ανοίγει <strong>έτοιμο email επιβεβαίωσης</strong> στο πρόγραμμα αλληλογραφίας σας — με παραλήπτη, κωδικό και σύνδεσμο — για αποστολή με ένα κλικ από το ιδρυματικό σας email. Email και κωδικός δεν εμφανίζονται ποτέ σε URL.</p>
+      <p class="hint" style="margin-bottom:6px">Ο λογαριασμός κάθε αιτούντος δημιουργείται αυτόματα με την <strong>υποβολή</strong> της αίτησης και το Firebase τού στέλνει email «Ορισμός κωδικού» (ο κωδικός που ορίζει δεν λήγει). Με την <strong>έγκριση</strong> ανοίγει έτοιμο email ενημέρωσης προς τον χρήστη με τον σύνδεσμο χρονοπρογραμματισμού — αποστολή με ένα κλικ. Email και κωδικός δεν εμφανίζονται ποτέ σε URL.</p>
       <div id="requestsList"></div>
     </div>
   </section>
@@ -253,26 +253,7 @@ function adminBookingModal(date, hour, b) {
   });
 }
 
-/* ---------- Αιτήματα: έγκριση → λογαριασμός + email με κωδικό ---------- */
-/* Κρυπτογραφικά τυχαίος 8ψήφιος κωδικός (crypto.getRandomValues).
-   Αποθηκεύεται ΜΟΝΟ κρυπτογραφημένος στο Firebase Authentication —
-   ποτέ στη βάση, ποτέ σε URL. */
-function genCode(len = 8) {
-  const a = new Uint32Array(len);
-  crypto.getRandomValues(a);
-  let c = "";
-  for (let i = 0; i < len; i++) c += String(a[i] % 10);
-  return c;
-}
-
-/* Δεύτερη σύνδεση Firebase, ώστε η δημιουργία λογαριασμού χρήστη
-   να μην αποσυνδέει τον διαχειριστή */
-let _sec = null;
-function secAuth() {
-  if (!_sec) _sec = firebase.initializeApp(FIREBASE_CONFIG, "acctCreate");
-  return _sec.auth();
-}
-
+/* ---------- Αιτήματα: έγκριση + ειδοποίηση χρήστη ---------- */
 function renderRequestsList() {
   const box = $("requestsList");
   const items = Object.entries(S.requests).sort((a, b) => (b[1].createdAt||0) - (a[1].createdAt||0));
@@ -309,7 +290,7 @@ function renderRequestsList() {
   box.querySelectorAll("[data-link]").forEach(btn => btn.onclick = () => {
     const r = S.requests[btn.dataset.link];
     const subject = `Σύνδεσμος χρονοπρογραμματισμού — ${S.session?.title || ""}`;
-    const body = `Αγαπητέ/ή ${r.name},\n\nΗ σελίδα χρονοπρογραμματισμού βιντεοσκόπησης:\n${scheduleLink()}\n\nΣυνδέεστε με το email σας και τον 8ψήφιο κωδικό που σας έχει σταλεί.`;
+    const body = `Αγαπητέ/ή ${r.name},\n\nΗ σελίδα χρονοπρογραμματισμού βιντεοσκόπησης:\n${scheduleLink()}\n\nΣυνδέεστε με το email σας και τον προσωπικό κωδικό που έχετε ορίσει· αν τον ξεχάσατε, πατήστε «Ξέχασα τον κωδικό» στη σελίδα εισόδου.`;
     openMailDraft(r.email, subject, body);
   });
   box.querySelectorAll("[data-reset]").forEach(btn => btn.onclick = async () => {
@@ -323,49 +304,20 @@ function renderRequestsList() {
 
 async function approveRequest(id) {
   const r = S.requests[id];
-  const code = genCode(8);
-  let created = false;
-  try {
-    await secAuth().createUserWithEmailAndPassword(normEmail(r.email), code);
-    await secAuth().signOut();
-    created = true;
-  } catch (e) {
-    if (e.code !== "auth/email-already-in-use") {
-      toast("Αποτυχία δημιουργίας λογαριασμού: " + (e.message || e.code), true);
-      return;
-    }
-  }
-  await db.ref(`sessions/${S.sessionId}/requests/${id}`).update({
-    status: "approved", decidedAt: Date.now(), account: created ? "created" : "existing"
-  });
-  if (created) {
-    sendApprovalEmail(r, code);
-  } else {
-    /* Ο λογαριασμός υπήρχε ήδη (π.χ. από προηγούμενο session) —
-       αποστολή email επαναφοράς κωδικού από το ίδιο το Firebase (δωρεάν) */
-    try { await auth.sendPasswordResetEmail(normEmail(r.email)); } catch (e) {}
-    sendApprovalEmail(r, null);
-    toast("Ο λογαριασμός υπήρχε ήδη — στάλθηκε και email επαναφοράς κωδικού.");
-  }
+  /* Δίχτυ ασφαλείας: αν για κάποιον λόγο δεν υπάρχει λογαριασμός
+     (π.χ. αίτημα από παλαιότερη έκδοση), δημιουργείται τώρα και το
+     Firebase στέλνει αυτόματα το email «Ορισμός κωδικού». */
+  const acc = await provisionAccount(r.email);
+  await db.ref(`sessions/${S.sessionId}/requests/${id}`).update({ status: "approved", decidedAt: Date.now() });
+  toast(`Ο/η ${r.name} εγκρίθηκε.` + (acc === "created" ? " Στάλθηκε email ορισμού κωδικού από το Firebase." : ""));
+  notifyApproval(r);
 }
 
-function sendApprovalEmail(r, code) {
-  const link = scheduleLink();
+function notifyApproval(r) {
   const subject = `Έγκριση αιτήματος βιντεοσκόπησης — ${S.session?.title || ""}`;
-  const credPart = code
-    ? `Στοιχεία εισόδου στη σελίδα χρονοπρογραμματισμού:\n  Σελίδα: ${link}\n  Email:  ${normEmail(r.email)}\n  8ψήφιος κωδικός εισόδου: ${code}\n\nΣυνδέεστε με το email σας και τον παραπάνω κωδικό. Ο κωδικός δεν έχει ημερομηνία λήξης — η πρώτη σύνδεση μπορεί να γίνει όποτε επιθυμείτε. Φυλάξτε τον και μην τον κοινοποιείτε.`
-    : `Σελίδα χρονοπρογραμματισμού: ${link}\nΟ λογαριασμός σας υπήρχε ήδη· θα λάβετε ξεχωριστό email από το Firebase για ορισμό νέου κωδικού.`;
-  const body = `Αγαπητέ/ή ${r.name},\n\nΤο αίτημά σας για βιντεοσκόπηση εγκρίθηκε.\n\n${credPart}\n\nΠερίοδος: ${fmtDate(S.session.dateFrom)} – ${fmtDate(S.session.dateTo)}, ώρες ${pad(S.session.hourStart)}:00–${pad(S.session.hourEnd)}:00.\nΈως ${MAX_HOURS_PER_DATE} ώρες ανά ημέρα · αλλαγές έως ${LOCK_DAYS} ημέρα πριν από κάθε βιντεοσκόπηση.`;
-  if (code) {
-    openModal({
-      title: "8ψήφιος κωδικός χρήστη",
-      meta: `${r.name} · ${normEmail(r.email)}`,
-      bodyHTML: `<p class="hint">Ο λογαριασμός δημιουργήθηκε. Ο κωδικός εμφανίζεται μόνο αυτή τη στιγμή (δεν αποθηκεύεται πουθενά) — πατήστε το κουμπί για να ανοίξει το έτοιμο email επιβεβαίωσης και στείλτε το:</p><div class="pwbox">${esc(code)}</div>`,
-      buttons: [{ label: "Άνοιγμα email προς αποστολή", kind: "", onClick: () => openMailDraft(r.email, subject, body) }]
-    });
-  } else {
-    openMailDraft(r.email, subject, body);
-  }
+  const body = `Αγαπητέ/ή ${r.name},\n\nΤο αίτημά σας για βιντεοσκόπηση εγκρίθηκε.\n\nΣελίδα χρονοπρογραμματισμού: ${scheduleLink()}\nΣυνδέεστε με το email σας και τον προσωπικό κωδικό που ορίσατε μέσω του email «Ορισμός κωδικού». Αν δεν τον ορίσατε ή τον ξεχάσατε, πατήστε «Ξέχασα τον κωδικό» στη σελίδα εισόδου για να λάβετε νέο σύνδεσμο.\n\nΠερίοδος: ${fmtDate(S.session.dateFrom)} – ${fmtDate(S.session.dateTo)}, ώρες ${pad(S.session.hourStart)}:00–${pad(S.session.hourEnd)}:00.\nΈως ${MAX_HOURS_PER_DATE} ώρες ανά ημέρα · αλλαγές έως ${LOCK_DAYS} ημέρα πριν από κάθε βιντεοσκόπηση.`;
+  openMailDraft(r.email, subject, body);
+  toast(`Άνοιξε email έγκρισης προς ${r.email} — πατήστε αποστολή.`);
 }
 
 /* ---------- Εγκεκριμένοι χρήστες & κρατήσεις τους ---------- */

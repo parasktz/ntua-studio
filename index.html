@@ -24,7 +24,7 @@
 
 <main class="wrap narrow">
   <h1>Αίτηση βιντεοσκόπησης</h1>
-  <p class="sub">Συμπληρώστε τα στοιχεία σας με το ιδρυματικό σας email. Μόλις εγκριθεί το αίτημα, θα λάβετε email επιβεβαίωσης με τον σύνδεσμο της σελίδας χρονοπρογραμματισμού και τον προσωπικό σας 8ψήφιο κωδικό εισόδου.</p>
+  <p class="sub">Συμπληρώστε τα στοιχεία σας με το ιδρυματικό σας email. Με την υποβολή θα λάβετε αμέσως email (από το σύστημα/Firebase) για να ορίσετε τον <strong>προσωπικό σας κωδικό</strong> — με αυτόν και το email σας θα συνδέεστε στη σελίδα χρονοπρογραμματισμού μόλις εγκριθεί το αίτημά σας.</p>
   <div class="card">
     <div id="reqMsg" class="msg-ok hidden"></div>
     <form id="formRequest">
@@ -38,7 +38,7 @@
       <textarea id="reqNotes" placeholder="Τι θέλετε να βιντεοσκοπήσετε, εκτιμώμενη διάρκεια κ.λπ."></textarea>
       <div class="btn-row">
         <button class="btn" type="submit">Υποβολή αίτησης</button>
-        <button class="btn secondary" type="button" onclick="location.href='schedule.html'">Έχω ήδη κωδικό</button>
+        <button class="btn secondary" type="button" onclick="location.href='schedule.html'">Έχω κωδικό — είσοδος</button>
       </div>
     </form>
   </div>
@@ -81,10 +81,18 @@ $("formRequest").addEventListener("submit", async e => {
       status: "pending",
       createdAt: Date.now()
     });
+    /* Δημιουργία λογαριασμού + email «Ορισμός κωδικού» από το Firebase */
+    const acc = await provisionAccount(email);
     $("formRequest").reset();
     const m = $("reqMsg");
     m.className = "msg-ok";
-    m.textContent = "Το αίτημά σας καταχωρήθηκε. Μόλις εγκριθεί, θα λάβετε email επιβεβαίωσης με τον 8ψήφιο κωδικό εισόδου σας.";
+    m.textContent = "Το αίτημά σας καταχωρήθηκε." + (
+      acc === "created"
+        ? " Σας στάλθηκε email για να ορίσετε τον προσωπικό σας κωδικό εισόδου (ελέγξτε και τα ανεπιθύμητα). Ο σύνδεσμος ορισμού είναι μίας χρήσης — ο κωδικός που θα ορίσετε δεν λήγει ποτέ. Θα ενημερωθείτε ξανά όταν εγκριθεί το αίτημα."
+        : acc === "exists"
+        ? " Υπάρχει ήδη λογαριασμός με αυτό το email — ισχύει ο κωδικός που είχατε ορίσει. Αν τον ξεχάσατε, πατήστε «Ξέχασα τον κωδικό» στη σελίδα χρονοπρογραμματισμού."
+        : " Η αποστολή του email ορισμού κωδικού απέτυχε — μπορείτε να το λάβετε αργότερα με το «Ξέχασα τον κωδικό» στη σελίδα χρονοπρογραμματισμού."
+    );
     toast("Το αίτημα υποβλήθηκε.");
   } catch (err) { toast("Σφάλμα κατά την υποβολή. Δοκιμάστε ξανά.", true); }
 });

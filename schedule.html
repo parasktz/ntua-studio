@@ -26,14 +26,14 @@
 <!-- Είσοδος χρήστη -->
 <main class="wrap narrow" id="schedGate">
   <h1>Χρονοπρογραμματισμός βιντεοσκόπησης</h1>
-  <p class="sub">Συνδεθείτε με το ιδρυματικό σας email και τον 8ψήφιο κωδικό που λάβατε στο email έγκρισης. Ο κωδικός δεν έχει ημερομηνία λήξης.</p>
+  <p class="sub">Συνδεθείτε με το ιδρυματικό σας email και τον προσωπικό κωδικό που ορίσατε μέσω του email «Ορισμός κωδικού». Ο κωδικός δεν έχει ημερομηνία λήξης.</p>
   <div class="card">
     <div id="gateErr" class="msg-err hidden"></div>
     <form id="formGate">
       <label for="gateEmail">Ιδρυματικό email</label>
       <input type="email" id="gateEmail" required autocomplete="username">
-      <label for="gatePass">Κωδικός (8ψήφιος, από το email έγκρισης)</label>
-      <input type="password" id="gatePass" required autocomplete="current-password" placeholder="••••••••">
+      <label for="gatePass">Κωδικός</label>
+      <input type="password" id="gatePass" required autocomplete="current-password">
       <div class="btn-row">
         <button class="btn" type="submit">Σύνδεση</button>
         <button class="btn secondary" type="button" id="btnForgot">Ξέχασα τον κωδικό</button>
@@ -87,9 +87,12 @@ let me = null;   // συνδεδεμένος χρήστης (firebase user)
 auth.onAuthStateChanged(u => { me = u; render(); });
 watchData(render);
 
+function myRequests() {
+  if (!me) return [];
+  return Object.values(S.requests).filter(x => normEmail(x.email) === normEmail(me.email));
+}
 function myRequest() {
-  if (!me) return null;
-  return approvedUsers().find(x => normEmail(x.email) === normEmail(me.email)) || null;
+  return myRequests().find(x => x.status === "approved") || null;
 }
 
 function render() {
@@ -111,8 +114,11 @@ function render() {
   if (!r) {
     $("schedMain").classList.add("hidden");
     $("schedInfo").classList.remove("hidden");
-    $("schedInfoMsg").className = "msg-err";
-    $("schedInfoMsg").textContent = "Δεν υπάρχει εγκεκριμένο αίτημα για τον λογαριασμό " + me.email + " στην τρέχουσα περίοδο. Αν μόλις υποβάλατε αίτηση, περιμένετε την έγκριση του διαχειριστή.";
+    const pending = myRequests().some(x => x.status === "pending");
+    $("schedInfoMsg").className = pending ? "msg-ok" : "msg-err";
+    $("schedInfoMsg").textContent = pending
+      ? "Το αίτημά σας έχει καταχωρηθεί και εκκρεμεί η έγκρισή του από τον διαχειριστή. Μόλις εγκριθεί, θα ενημερωθείτε με email και θα εμφανιστεί εδώ το ημερολόγιο."
+      : "Δεν υπάρχει εγκεκριμένο αίτημα για τον λογαριασμό " + me.email + " στην τρέχουσα περίοδο.";
     return;
   }
   $("schedInfo").classList.add("hidden");
@@ -131,7 +137,7 @@ $("formGate").addEventListener("submit", async e => {
   try {
     await auth.signInWithEmailAndPassword(normEmail($("gateEmail").value), $("gatePass").value);
   } catch (err) {
-    $("gateErr").textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός. Ο 8ψήφιος κωδικός σάς έχει σταλεί στο email έγκρισης.";
+    $("gateErr").textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός. Αν δεν έχετε ορίσει ακόμη κωδικό, πατήστε «Ξέχασα τον κωδικό» για να λάβετε νέο email ορισμού.";
     $("gateErr").classList.remove("hidden");
   }
 });
