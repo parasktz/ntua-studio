@@ -24,7 +24,7 @@ const EMAILJS = {
 };
 
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
-   email), π.χ. "https://studio.uniwa.gr/booking/". Αν μείνει κενό,
+   email), π.χ. "https://studio.ntua.gr/booking/". Αν μείνει κενό,
    χρησιμοποιείται αυτόματα η τρέχουσα διεύθυνση. */
 const APP_URL = "";
 
