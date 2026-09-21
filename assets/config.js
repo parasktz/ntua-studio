@@ -4,13 +4,13 @@
    ===================================================================== */
 
 const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
+   apiKey: "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
+  authDomain: "ntua-studio.firebaseapp.com",
+  databaseURL: "https://ntua-studio-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "ntua-studio",
+  storageBucket: "ntua-studio.firebasestorage.app",
+  messagingSenderId: "310321089066",
+  appId: "1:310321089066:web:9b46d1fe8db08ae879d153"
 };
 
 /* EmailJS — ΑΥΤΟΜΑΤΗ αποστολή όλων των email (δωρεάν πρόγραμμα, χωρίς
@@ -18,9 +18,9 @@ const FIREBASE_CONFIG = {
    Όσο τα πεδία είναι κενά, η πλατφόρμα λειτουργεί με τον εναλλακτικό
    τρόπο: ανοίγει έτοιμο email στο πρόγραμμα αλληλογραφίας του admin. */
 const EMAILJS = {
-  publicKey:  "",   // Account → General → Public Key
-  serviceId:  "",   // Email Services → π.χ. "service_abc1234"
-  templateId: ""    // Email Templates → π.χ. "template_xyz5678"
+  publicKey:  "eLq4Nzn-K-57wx9Q-",   // Account → General → Public Key
+  serviceId:  "service_p2r2sk3v1",   // Email Services → π.χ. "service_abc1234"
+  templateId: "template_studio_ntua"    // Email Templates → π.χ. "template_xyz5678"
 };
 
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
