@@ -260,6 +260,23 @@ async function provisionAccount(email) {
   }
 }
 
+/* Αναλυτικό ελληνικό μήνυμα για σφάλματα σύνδεσης του Firebase */
+function authErrorMessage(e) {
+  const c = (e && e.code) || "";
+  const msg = {
+    "auth/user-not-found": "Δεν υπάρχει λογαριασμός με αυτό το email.",
+    "auth/wrong-password": "Λανθασμένος κωδικός (ή δεν έχει οριστεί ακόμη κωδικός).",
+    "auth/invalid-credential": "Λανθασμένο email ή κωδικός (ή δεν έχει οριστεί ακόμη κωδικός).",
+    "auth/invalid-login-credentials": "Λανθασμένο email ή κωδικός (ή δεν έχει οριστεί ακόμη κωδικός).",
+    "auth/invalid-email": "Μη έγκυρη μορφή email.",
+    "auth/too-many-requests": "Πολλές αποτυχημένες προσπάθειες — το Firebase μπλόκαρε προσωρινά τις συνδέσεις από αυτή τη συσκευή. Περιμένετε λίγο ή κάντε επαναφορά κωδικού.",
+    "auth/operation-not-allowed": "Η σύνδεση Email/Password δεν είναι ενεργοποιημένη στο Firebase (κονσόλα → Authentication → Sign-in method).",
+    "auth/network-request-failed": "Πρόβλημα δικτύου — ελέγξτε τη σύνδεσή σας.",
+    "auth/user-disabled": "Ο λογαριασμός έχει απενεργοποιηθεί από τον διαχειριστή."
+  }[c] || "Αποτυχία σύνδεσης.";
+  return c ? `${msg} [${c}]` : msg;
+}
+
 /* Ανοίγει έτοιμο email στο προεπιλεγμένο πρόγραμμα αλληλογραφίας */
 function openMailDraft(to, subject, message) {
   const a = document.createElement("a");
