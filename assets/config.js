@@ -1,5 +1,5 @@
 // Your web app's Firebase configuration
-const firebaseConfig = {
+const FIREBASE_CONFIG = {
   apiKey: "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
   authDomain: "ntua-studio.firebaseapp.com",
   databaseURL: "https://ntua-studio-default-rtdb.europe-west1.firebasedatabase.app",
