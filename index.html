@@ -24,7 +24,7 @@
 
 <main class="wrap narrow">
   <h1>Αίτηση βιντεοσκόπησης</h1>
-  <p class="sub">Συμπληρώστε τα στοιχεία σας με το ιδρυματικό σας email του ΕΜΠ (…ntua.gr) — η εγγραφή είναι δυνατή μόνο με ιδρυματικά credentials. Με την υποβολή θα λάβετε αμέσως email (από το σύστημα/Firebase) για να ορίσετε τον <strong>προσωπικό σας κωδικό</strong> — με αυτόν και το email σας θα συνδέεστε στη σελίδα χρονοπρογραμματισμού μόλις εγκριθεί το αίτημά σας.</p>
+  <p class="sub">Συμπληρώστε τα στοιχεία σας με το ιδρυματικό σας email του ΕΜΠ (…ntua.gr). H εγγραφή είναι δυνατή μόνο με ιδρυματικά credentials. Με την υποβολή θα λάβετε αμέσως email (από το noreply@ntua-studio.firebaseapp.com) για να ορίσετε τον <strong>προσωπικό σας κωδικό</strong> — με αυτόν και το email σας θα συνδέεστε στη σελίδα χρονοπρογραμματισμού μόλις εγκριθεί το αίτημά σας.</p>
   <div class="card">
     <div id="reqMsg" class="msg-ok hidden"></div>
     <form id="formRequest">
@@ -32,13 +32,13 @@
       <input type="text" id="reqName" required autocomplete="name">
       <label for="reqEmail">Ιδρυματικό email (ntua.gr)</label>
       <input type="email" id="reqEmail" required autocomplete="email" placeholder="onoma@mail.ntua.gr">
-      <label for="reqDept">Τμήμα / Μονάδα</label>
+      <label for="reqDept">Σχολή / Τομέας / Εργαστήριο</label>
       <input type="text" id="reqDept">
       <label for="reqNotes">Περιγραφή αιτήματος</label>
       <textarea id="reqNotes" placeholder="Τι θέλετε να βιντεοσκοπήσετε, εκτιμώμενη διάρκεια κ.λπ."></textarea>
       <div class="btn-row">
         <button class="btn" type="submit">Υποβολή αίτησης</button>
-        <button class="btn secondary" type="button" onclick="location.href='schedule.html'">Έχω κωδικό — είσοδος</button>
+        <button class="btn secondary" type="button" onclick="location.href='schedule.html'">Έχω κωδικό —> είσοδος</button>
       </div>
     </form>
   </div>
