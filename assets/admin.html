@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Διαχείριση — Studio Βιντεοσκόπησης</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&subset=greek&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
+  <div class="session-title" id="topSessionTitle"></div>
+  <div class="spacer"></div>
+  <span class="who" id="topWho"></span>
+  <button class="btn secondary small" id="btnLogout">Αποσύνδεση</button>
+</header>
+
+<main class="wrap hidden" id="adminMain">
+  <h1>Διαχείριση studio</h1>
+  <p class="sub">Ρυθμίστε το ημερολόγιο, εγκρίνετε αιτήματα και διαχειριστείτε τις κρατήσεις όλων των χρηστών.</p>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="config">Ρυθμίσεις session</button>
+    <button class="tab" data-tab="calendar">Ημερολόγιο &amp; διαθεσιμότητα</button>
+    <button class="tab" data-tab="requests">Αιτήματα <span class="badge pending hidden" id="pendingCount"></span></button>
+    <button class="tab" data-tab="users">Χρήστες &amp; κρατήσεις</button>
+  </nav>
+
+  <section id="tab-config">
+    <div class="card">
+      <h2>Ενεργό session βιντεοσκοπήσεων</h2>
+      <form id="formConfig">
+        <label for="cfgTitle">Τίτλος βιντεοσκόπησης</label>
+        <input type="text" id="cfgTitle" required placeholder="π.χ. Βιντεοσκοπήσεις χειμερινού εξαμήνου 2026–27">
+        <div class="row2">
+          <div>
+            <label for="cfgFrom">Από ημερομηνία</label>
+            <input type="date" id="cfgFrom" required>
+          </div>
+          <div>
+            <label for="cfgTo">Έως ημερομηνία</label>
+            <input type="date" id="cfgTo" required>
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="cfgHFrom">Ώρα έναρξης</label>
+            <select id="cfgHFrom"></select>
+          </div>
+          <div>
+            <label for="cfgHTo">Ώρα λήξης</label>
+            <select id="cfgHTo"></select>
+          </div>
+        </div>
+        <p class="hint">Τα slots είναι ωριαία. Κάθε χρήστης μπορεί να δεσμεύσει έως 4 ώρες ανά ημέρα.</p>
+        <div class="btn-row">
+          <button class="btn" type="submit">Αποθήκευση ρυθμίσεων</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="tab-calendar" class="hidden">
+    <div class="card">
+      <h2>Διαθεσιμότητα studio</h2>
+      <p class="hint" style="margin-bottom:14px">Κάντε κλικ σε ένα κενό slot για να το ορίσετε ως <strong>μη διαθέσιμο</strong> (κλειστό studio) και ξανά κλικ για να το ανοίξετε. Κλικ σε κράτηση χρήστη για προβολή/επεξεργασία. Για νέα κράτηση εκ μέρους χρήστη, επιλέξτε πρώτα χρήστη:</p>
+      <label for="admAssign">Ανάθεση κράτησης σε χρήστη</label>
+      <select id="admAssign"><option value="">— Λειτουργία διαθεσιμότητας (κλείσιμο slots) —</option></select>
+      <div style="margin-top:16px" id="adminCal"></div>
+    </div>
+  </section>
+
+  <section id="tab-requests" class="hidden">
+    <div class="card">
+      <h2>Αιτήματα βιντεοσκόπησης</h2>
+      <p class="hint" style="margin-bottom:6px">Με την έγκριση δημιουργείται λογαριασμός χρήστη στο Firebase με <strong>8ψήφιο κωδικό</strong> εισόδου (χωρίς ημερομηνία λήξης) και ανοίγει <strong>έτοιμο email επιβεβαίωσης</strong> στο πρόγραμμα αλληλογραφίας σας — με παραλήπτη, κωδικό και σύνδεσμο — για αποστολή με ένα κλικ από το ιδρυματικό σας email. Email και κωδικός δεν εμφανίζονται ποτέ σε URL.</p>
+      <div id="requestsList"></div>
+    </div>
+  </section>
+
+  <section id="tab-users" class="hidden">
+    <div class="card">
+      <h2>Εγκεκριμένοι χρήστες &amp; κρατήσεις τους</h2>
+      <div id="usersList"></div>
+    </div>
+  </section>
+</main>
+
+<main class="wrap narrow hidden" id="noRights">
+  <div class="card">
+    <div class="msg-err">Ο λογαριασμός σας δεν έχει δικαιώματα διαχειριστή.</div>
+    <button class="btn secondary" onclick="auth.signOut().then(()=>location.href='login.html')">Αποσύνδεση</button>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="mTitle"></h3>
+    <div class="meta" id="mMeta"></div>
+    <div id="mBody"></div>
+    <div class="btn-row" id="mBtns"></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+/* ---------- Φύλαξη σελίδας: μόνο διαχειριστές ---------- */
+auth.onAuthStateChanged(async u => {
+  if (!u) { location.href = "login.html"; return; }
+  const ok = !!(await db.ref("admins/" + u.uid).get()).val();
+  $("adminMain").classList.toggle("hidden", !ok);
+  $("noRights").classList.toggle("hidden", ok);
+  $("topWho").textContent = u.email + (ok ? " · διαχειριστής" : "");
+  if (ok) watchData(renderAdmin);
+});
+
+/* ---------- Καρτέλες ---------- */
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+  ["config","calendar","requests","users"].forEach(n =>
+    $("tab-" + n).classList.toggle("hidden", n !== t.dataset.tab));
+}));
+
+(function fillHourSelects() {
+  const opts = h => `<option value="${h}">${pad(h)}:00</option>`;
+  let a = "", b = "";
+  for (let h = 0; h <= 23; h++) a += opts(h);
+  for (let h = 1; h <= 24; h++) b += opts(h);
+  $("cfgHFrom").innerHTML = a; $("cfgHTo").innerHTML = b;
+  $("cfgHFrom").value = 9; $("cfgHTo").value = 22;
+})();
+
+function renderAdmin() {
+  const editingCfg = document.activeElement && $("formConfig").contains(document.activeElement);
+  if (S.session && !editingCfg) {
+    $("cfgTitle").value = S.session.title || "";
+    $("cfgFrom").value = S.session.dateFrom || "";
+    $("cfgTo").value = S.session.dateTo || "";
+    $("cfgHFrom").value = S.session.hourStart ?? 9;
+    $("cfgHTo").value = S.session.hourEnd ?? 22;
+  }
+  renderAdminCalendar();
+  renderRequestsList();
+  renderUsersList();
+}
+
+/* ---------- Ρυθμίσεις session ---------- */
+$("formConfig").addEventListener("submit", async e => {
+  e.preventDefault();
+  const meta = {
+    title: $("cfgTitle").value.trim(),
+    dateFrom: $("cfgFrom").value,
+    dateTo: $("cfgTo").value,
+    hourStart: +$("cfgHFrom").value,
+    hourEnd: +$("cfgHTo").value,
+    updatedAt: Date.now()
+  };
+  if (meta.dateFrom > meta.dateTo) { toast("Η ημερομηνία «Από» πρέπει να προηγείται της «Έως».", true); return; }
+  if (meta.hourStart >= meta.hourEnd) { toast("Η ώρα έναρξης πρέπει να προηγείται της λήξης.", true); return; }
+  try {
+    let sid = S.sessionId;
+    if (!sid) {
+      sid = db.ref("sessions").push().key;
+      await db.ref(`sessions/${sid}/meta`).set(meta);
+      await db.ref("activeSession").set(sid);
+    } else {
+      await db.ref(`sessions/${sid}/meta`).update(meta);
+    }
+    toast("Οι ρυθμίσεις αποθηκεύτηκαν.");
+  } catch (err) { toast("Σφάλμα αποθήκευσης ρυθμίσεων.", true); }
+});
+
+/* ---------- Ημερολόγιο: μη διαθέσιμα slots & όλες οι κρατήσεις ---------- */
+function renderAdminCalendar() {
+  const sel = $("admAssign"), prev = sel.value;
+  sel.innerHTML = '<option value="">— Λειτουργία διαθεσιμότητας (κλείσιμο slots) —</option>' +
+    approvedUsers().map(u => `<option value="${esc(u.email)}">${esc(u.name)} · ${esc(u.email)}</option>`).join("");
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  buildCalendar("adminCal", "admin", null, adminCellClick);
+}
+
+async function adminCellClick(date, hour) {
+  if (daysDiff(date) < 0) { toast("Η ημερομηνία έχει παρέλθει.", true); return; }
+  const b = S.bookings?.[date]?.[hour];
+  const blocked = !!S.blocked?.[date]?.[hour];
+  const assignTo = $("admAssign").value;
+
+  if (b) { adminBookingModal(date, hour, b); return; }
+
+  if (blocked) {
+    await db.ref(`sessions/${S.sessionId}/blocked/${date}/${hour}`).remove();
+    toast(`Το slot ${fmtDate(date)} ${fmtHour(hour)} είναι ξανά διαθέσιμο.`);
+    return;
+  }
+  if (!assignTo) {
+    await db.ref(`sessions/${S.sessionId}/blocked/${date}/${hour}`).set(true);
+    toast(`Το slot ${fmtDate(date)} ${fmtHour(hour)} ορίστηκε μη διαθέσιμο.`);
+    return;
+  }
+  /* Κράτηση εκ μέρους χρήστη */
+  if (userHoursOn(assignTo, date) >= MAX_HOURS_PER_DATE) {
+    toast(`Ο χρήστης έχει ήδη ${MAX_HOURS_PER_DATE} ώρες στις ${fmtDate(date)}.`, true); return;
+  }
+  const u = approvedUsers().find(x => normEmail(x.email) === normEmail(assignTo));
+  openModal({
+    title: "Νέα κράτηση για χρήστη",
+    meta: `${u?.name || assignTo} · ${fmtDate(date)} · ${fmtHour(hour)}`,
+    bodyHTML: `<label for="mDesc">Περιγραφή εργασίας</label><textarea id="mDesc"></textarea>`,
+    buttons: [
+      { label: "Άκυρο" },
+      { label: "Καταχώρηση", kind: "", onClick: async () => {
+          await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).set({
+            email: normEmail(assignTo), name: u?.name || "", desc: $("mDesc").value.trim(), updatedAt: Date.now()
+          });
+          toast("Η κράτηση καταχωρήθηκε.");
+          queueChangeEmail(assignTo);
+        } }
+    ]
+  });
+}
+
+function adminBookingModal(date, hour, b) {
+  openModal({
+    title: "Κράτηση χρήστη",
+    meta: `${fmtDate(date)} · ${fmtHour(hour)}`,
+    bodyHTML: `
+      <p><strong>${esc(b.name || "")}</strong><br><span class="meta">${esc(b.email)}</span></p>
+      <label for="mDesc">Περιγραφή εργασίας</label>
+      <textarea id="mDesc">${esc(b.desc || "")}</textarea>`,
+    buttons: [
+      { label: "Άκυρο" },
+      { label: "Διαγραφή", kind: "danger", onClick: async () => {
+          await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).remove();
+          toast("Η κράτηση διαγράφηκε.");
+          queueChangeEmail(b.email);
+        } },
+      { label: "Αποθήκευση", kind: "", onClick: async () => {
+          await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).update({ desc: $("mDesc").value.trim(), updatedAt: Date.now() });
+          toast("Η κράτηση ενημερώθηκε.");
+          queueChangeEmail(b.email);
+        } }
+    ]
+  });
+}
+
+/* ---------- Αιτήματα: έγκριση → λογαριασμός + email με κωδικό ---------- */
+/* Κρυπτογραφικά τυχαίος 8ψήφιος κωδικός (crypto.getRandomValues).
+   Αποθηκεύεται ΜΟΝΟ κρυπτογραφημένος στο Firebase Authentication —
+   ποτέ στη βάση, ποτέ σε URL. */
+function genCode(len = 8) {
+  const a = new Uint32Array(len);
+  crypto.getRandomValues(a);
+  let c = "";
+  for (let i = 0; i < len; i++) c += String(a[i] % 10);
+  return c;
+}
+
+/* Δεύτερη σύνδεση Firebase, ώστε η δημιουργία λογαριασμού χρήστη
+   να μην αποσυνδέει τον διαχειριστή */
+let _sec = null;
+function secAuth() {
+  if (!_sec) _sec = firebase.initializeApp(FIREBASE_CONFIG, "acctCreate");
+  return _sec.auth();
+}
+
+function renderRequestsList() {
+  const box = $("requestsList");
+  const items = Object.entries(S.requests).sort((a, b) => (b[1].createdAt||0) - (a[1].createdAt||0));
+  const pending = items.filter(([,r]) => r.status === "pending").length;
+  $("pendingCount").textContent = pending;
+  $("pendingCount").classList.toggle("hidden", !pending);
+  if (!items.length) { box.innerHTML = '<p class="empty">Δεν υπάρχουν αιτήματα ακόμη.</p>'; return; }
+
+  const badge = s => s === "approved" ? '<span class="badge approved">Εγκρίθηκε</span>'
+                : s === "rejected" ? '<span class="badge rejected">Απορρίφθηκε</span>'
+                : '<span class="badge pending">Σε αναμονή</span>';
+  box.innerHTML = items.map(([id, r]) => `
+    <div class="list-item">
+      <div>
+        <strong>${esc(r.name)}</strong> ${badge(r.status)}<br>
+        <span class="meta">${esc(r.email)}${r.dept ? " · " + esc(r.dept) : ""} · ${new Date(r.createdAt).toLocaleDateString("el-GR")}</span>
+        ${r.notes ? `<div class="meta" style="margin-top:4px">«${esc(r.notes)}»</div>` : ""}
+      </div>
+      <div class="btn-row" style="margin-top:0">
+        ${r.status === "pending" ? `
+          <button class="btn small" data-approve="${id}">Έγκριση</button>
+          <button class="btn secondary small" data-reject="${id}">Απόρριψη</button>` : ""}
+        ${r.status === "approved" ? `
+          <button class="btn secondary small" data-link="${id}">Αποστολή link</button>
+          <button class="btn secondary small" data-reset="${id}">Επαναφορά κωδικού</button>` : ""}
+      </div>
+    </div>`).join("");
+
+  box.querySelectorAll("[data-approve]").forEach(btn => btn.onclick = () => approveRequest(btn.dataset.approve));
+  box.querySelectorAll("[data-reject]").forEach(btn => btn.onclick = async () => {
+    await db.ref(`sessions/${S.sessionId}/requests/${btn.dataset.reject}`).update({ status: "rejected", decidedAt: Date.now() });
+    toast("Το αίτημα απορρίφθηκε.");
+  });
+  box.querySelectorAll("[data-link]").forEach(btn => btn.onclick = () => {
+    const r = S.requests[btn.dataset.link];
+    const subject = `Σύνδεσμος χρονοπρογραμματισμού — ${S.session?.title || ""}`;
+    const body = `Αγαπητέ/ή ${r.name},\n\nΗ σελίδα χρονοπρογραμματισμού βιντεοσκόπησης:\n${scheduleLink()}\n\nΣυνδέεστε με το email σας και τον 8ψήφιο κωδικό που σας έχει σταλεί.`;
+    openMailDraft(r.email, subject, body);
+  });
+  box.querySelectorAll("[data-reset]").forEach(btn => btn.onclick = async () => {
+    const r = S.requests[btn.dataset.reset];
+    try {
+      await auth.sendPasswordResetEmail(normEmail(r.email));
+      toast(`Στάλθηκε email επαναφοράς κωδικού στο ${r.email} (μέσω Firebase).`);
+    } catch (e) { toast("Αποτυχία αποστολής email επαναφοράς.", true); }
+  });
+}
+
+async function approveRequest(id) {
+  const r = S.requests[id];
+  const code = genCode(8);
+  let created = false;
+  try {
+    await secAuth().createUserWithEmailAndPassword(normEmail(r.email), code);
+    await secAuth().signOut();
+    created = true;
+  } catch (e) {
+    if (e.code !== "auth/email-already-in-use") {
+      toast("Αποτυχία δημιουργίας λογαριασμού: " + (e.message || e.code), true);
+      return;
+    }
+  }
+  await db.ref(`sessions/${S.sessionId}/requests/${id}`).update({
+    status: "approved", decidedAt: Date.now(), account: created ? "created" : "existing"
+  });
+  if (created) {
+    sendApprovalEmail(r, code);
+  } else {
+    /* Ο λογαριασμός υπήρχε ήδη (π.χ. από προηγούμενο session) —
+       αποστολή email επαναφοράς κωδικού από το ίδιο το Firebase (δωρεάν) */
+    try { await auth.sendPasswordResetEmail(normEmail(r.email)); } catch (e) {}
+    sendApprovalEmail(r, null);
+    toast("Ο λογαριασμός υπήρχε ήδη — στάλθηκε και email επαναφοράς κωδικού.");
+  }
+}
+
+function sendApprovalEmail(r, code) {
+  const link = scheduleLink();
+  const subject = `Έγκριση αιτήματος βιντεοσκόπησης — ${S.session?.title || ""}`;
+  const credPart = code
+    ? `Στοιχεία εισόδου στη σελίδα χρονοπρογραμματισμού:\n  Σελίδα: ${link}\n  Email:  ${normEmail(r.email)}\n  8ψήφιος κωδικός εισόδου: ${code}\n\nΣυνδέεστε με το email σας και τον παραπάνω κωδικό. Ο κωδικός δεν έχει ημερομηνία λήξης — η πρώτη σύνδεση μπορεί να γίνει όποτε επιθυμείτε. Φυλάξτε τον και μην τον κοινοποιείτε.`
+    : `Σελίδα χρονοπρογραμματισμού: ${link}\nΟ λογαριασμός σας υπήρχε ήδη· θα λάβετε ξεχωριστό email από το Firebase για ορισμό νέου κωδικού.`;
+  const body = `Αγαπητέ/ή ${r.name},\n\nΤο αίτημά σας για βιντεοσκόπηση εγκρίθηκε.\n\n${credPart}\n\nΠερίοδος: ${fmtDate(S.session.dateFrom)} – ${fmtDate(S.session.dateTo)}, ώρες ${pad(S.session.hourStart)}:00–${pad(S.session.hourEnd)}:00.\nΈως ${MAX_HOURS_PER_DATE} ώρες ανά ημέρα · αλλαγές έως ${LOCK_DAYS} ημέρα πριν από κάθε βιντεοσκόπηση.`;
+  if (code) {
+    openModal({
+      title: "8ψήφιος κωδικός χρήστη",
+      meta: `${r.name} · ${normEmail(r.email)}`,
+      bodyHTML: `<p class="hint">Ο λογαριασμός δημιουργήθηκε. Ο κωδικός εμφανίζεται μόνο αυτή τη στιγμή (δεν αποθηκεύεται πουθενά) — πατήστε το κουμπί για να ανοίξει το έτοιμο email επιβεβαίωσης και στείλτε το:</p><div class="pwbox">${esc(code)}</div>`,
+      buttons: [{ label: "Άνοιγμα email προς αποστολή", kind: "", onClick: () => openMailDraft(r.email, subject, body) }]
+    });
+  } else {
+    openMailDraft(r.email, subject, body);
+  }
+}
+
+/* ---------- Εγκεκριμένοι χρήστες & κρατήσεις τους ---------- */
+function renderUsersList() {
+  const box = $("usersList");
+  const users = approvedUsers();
+  if (!users.length) { box.innerHTML = '<p class="empty">Δεν υπάρχουν εγκεκριμένοι χρήστες ακόμη.</p>'; return; }
+  box.innerHTML = users.map(u => {
+    const slots = userSlots(u.email);
+    return `
+      <div class="list-item">
+        <div style="flex:1">
+          <strong>${esc(u.name)}</strong> <span class="badge approved">Εγκρίθηκε</span><br>
+          <span class="meta">${esc(u.email)}${u.dept ? " · " + esc(u.dept) : ""}</span>
+          ${u.notes ? `<div class="meta" style="margin-top:4px">Αίτημα: «${esc(u.notes)}»</div>` : ""}
+          ${slots.length ? `<ul class="slots-list">${slots.map(s =>
+            `<li><span class="mono">${fmtDate(s.date)} ${fmtHour(s.hour)}</span>${s.desc ? " — " + esc(s.desc) : ""}</li>`).join("")}</ul>`
+            : '<div class="meta" style="margin-top:6px">Χωρίς κρατήσεις ακόμη.</div>'}
+        </div>
+      </div>`;
+  }).join("");
+}
+</script>
+</body>
+</html>
