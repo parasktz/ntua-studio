@@ -79,7 +79,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="assets/config.js"></script>
 <script src="assets/common.js"></script>
 <script>
@@ -165,12 +164,10 @@ function userCellClick(date, hour) {
         { label: "Ακύρωση κράτησης", kind: "danger", onClick: async () => {
             await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).remove();
             toast("Η κράτηση ακυρώθηκε.");
-            queueChangeEmail(me.email, false);
           } },
         { label: "Αποθήκευση", kind: "", onClick: async () => {
             await db.ref(`sessions/${S.sessionId}/bookings/${date}/${hour}`).update({ desc: $("mDesc").value.trim(), updatedAt: Date.now() });
             toast("Η περιγραφή ενημερώθηκε.");
-            queueChangeEmail(me.email, false);
           } }
       ]
     });
@@ -196,7 +193,6 @@ function userCellClick(date, hour) {
           }, (err, committed) => {
             if (err || !committed) { toast("Το slot μόλις δεσμεύτηκε από άλλον χρήστη.", true); return; }
             toast("Η κράτηση καταχωρήθηκε.");
-            queueChangeEmail(me.email, false);
           });
         } }
     ]
