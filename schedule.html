@@ -149,7 +149,7 @@ $("formGate").addEventListener("submit", async e => {
   try {
     await auth.signInWithEmailAndPassword(normEmail($("gateEmail").value), $("gatePass").value);
   } catch (err) {
-    $("gateErr").textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός. Αν δεν έχετε ορίσει ακόμη κωδικό, πατήστε «Ξέχασα τον κωδικό» για να λάβετε νέο email ορισμού.";
+    $("gateErr").textContent = authErrorMessage(err) + " Αν δεν έχετε ορίσει ακόμη κωδικό, πατήστε «Ξέχασα τον κωδικό» για να λάβετε email ορισμού.";
     $("gateErr").classList.remove("hidden");
   }
 });
@@ -158,9 +158,20 @@ $("btnForgot").addEventListener("click", async () => {
   const email = normEmail($("gateEmail").value);
   if (!email) { toast("Συμπληρώστε πρώτα το email σας.", true); return; }
   try {
+    /* Αν υπάρχει αίτημα με αυτό το email αλλά ο λογαριασμός δεν έχει
+       δημιουργηθεί ποτέ (π.χ. παλαιότερη αίτηση), δημιουργείται τώρα
+       και το Firebase στέλνει αμέσως email ορισμού κωδικού. */
+    const hasReq = Object.values(S.requests).some(r => normEmail(r.email) === email && r.status !== "rejected");
+    if (hasReq) {
+      const acc = await provisionAccount(email);
+      if (acc === "created") {
+        toast("Ο λογαριασμός σας δεν υπήρχε ακόμη — δημιουργήθηκε τώρα και σας στάλθηκε email ορισμού κωδικού (ελέγξτε και τα ανεπιθύμητα).");
+        return;
+      }
+    }
     await auth.sendPasswordResetEmail(email);
-    toast("Στάλθηκε email επαναφοράς κωδικού από το Firebase. Ο σύνδεσμος επαναφοράς ισχύει για περιορισμένο χρόνο — ο νέος κωδικός που θα ορίσετε δεν λήγει.");
-  } catch (e) { toast("Αποτυχία αποστολής email επαναφοράς.", true); }
+    toast("Στάλθηκε email ορισμού/επαναφοράς κωδικού από το Firebase (ελέγξτε και τα ανεπιθύμητα). Ο σύνδεσμος είναι μίας χρήσης — ο κωδικός που θα ορίσετε δεν λήγει.");
+  } catch (e) { toast("Αποτυχία αποστολής email: " + authErrorMessage(e), true); }
 });
 
 /* ---------- Κρατήσεις χρήστη ---------- */

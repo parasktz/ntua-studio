@@ -64,7 +64,7 @@ $("btnAdmForgot").addEventListener("click", async () => {
   try {
     await auth.sendPasswordResetEmail(email);
     toast("Στάλθηκε email ορισμού/επαναφοράς κωδικού από το Firebase — ανοίξτε τον σύνδεσμο και ορίστε νέο κωδικό.");
-  } catch (e) { toast("Αποτυχία αποστολής email επαναφοράς.", true); }
+  } catch (e) { toast("Αποτυχία αποστολής email: " + authErrorMessage(e), true); }
 });
 
 $("formLogin").addEventListener("submit", async e => {
@@ -78,7 +78,7 @@ $("formLogin").addEventListener("submit", async e => {
     err.textContent = "Ο λογαριασμός δεν έχει δικαιώματα διαχειριστή. Οι χρήστες συνδέονται στη σελίδα «Χρονοπρογραμματισμός».";
     err.classList.remove("hidden");
   } catch (e2) {
-    err.textContent = "Αποτυχία σύνδεσης: λανθασμένο email ή κωδικός.";
+    err.textContent = authErrorMessage(e2) + " Ο λογαριασμός διαχειριστή δημιουργείται στην κονσόλα Firebase (Authentication → Users).";
     err.classList.remove("hidden");
   }
 });
