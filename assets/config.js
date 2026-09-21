@@ -13,6 +13,16 @@ const FIREBASE_CONFIG = {
   appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
 };
 
+/* EmailJS — ΑΥΤΟΜΑΤΗ αποστολή όλων των email (δωρεάν πρόγραμμα, χωρίς
+   κάρτα, ~200 email/μήνα). Οδηγίες ενεργοποίησης: README, βήμα 3.
+   Όσο τα πεδία είναι κενά, η πλατφόρμα λειτουργεί με τον εναλλακτικό
+   τρόπο: ανοίγει έτοιμο email στο πρόγραμμα αλληλογραφίας του admin. */
+const EMAILJS = {
+  publicKey:  "",   // Account → General → Public Key
+  serviceId:  "",   // Email Services → π.χ. "service_abc1234"
+  templateId: ""    // Email Templates → π.χ. "template_xyz5678"
+};
+
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
    email), π.χ. "https://studio.uniwa.gr/booking/". Αν μείνει κενό,
    χρησιμοποιείται αυτόματα η τρέχουσα διεύθυνση. */
