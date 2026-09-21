@@ -3,7 +3,35 @@
    και το config.js.
    ===================================================================== */
 
-firebase.initializeApp(FIREBASE_CONFIG);
+/* Ανθεκτικότητα ρυθμίσεων:
+   • Δεκτό είτε FIREBASE_CONFIG (το δικό μας όνομα) είτε firebaseConfig
+     (το όνομα του snippet της κονσόλας Firebase).
+   • Αν λείπουν οι υπόλοιπες σταθερές (π.χ. επειδή αντικαταστάθηκε όλο
+     το config.js), ισχύουν προεπιλογές. */
+if (typeof ALLOWED_EMAIL_DOMAINS === "undefined") window.ALLOWED_EMAIL_DOMAINS = ["ntua.gr"];
+if (typeof APP_URL === "undefined") window.APP_URL = "";
+if (typeof MAX_HOURS_PER_DATE === "undefined") window.MAX_HOURS_PER_DATE = 4;
+if (typeof LOCK_DAYS === "undefined") window.LOCK_DAYS = 1;
+
+const CFG = (typeof FIREBASE_CONFIG !== "undefined" && FIREBASE_CONFIG)
+  ? FIREBASE_CONFIG
+  : (typeof firebaseConfig !== "undefined" && firebaseConfig ? firebaseConfig : null);
+
+/* Εμφανής προειδοποίηση αν το config λείπει ή είναι placeholder */
+if (!CFG || !CFG.apiKey || /^YOUR_/i.test(CFG.apiKey) || !/^AIza/.test(CFG.apiKey)) {
+  document.addEventListener("DOMContentLoaded", () => {
+    const d = document.createElement("div");
+    d.className = "msg-err";
+    d.style.cssText = "max-width:1100px;margin:14px auto 0;padding:12px 16px;";
+    d.textContent = !CFG
+      ? "Ρύθμιση: δεν βρέθηκε FIREBASE_CONFIG στο assets/config.js. Μην επικολλάτε το snippet της κονσόλας με τις γραμμές import — αντιγράψτε ΜΟΝΟ τις τιμές (apiKey κ.λπ.) μέσα στο έτοιμο FIREBASE_CONFIG του αρχείου."
+      : "Ρύθμιση: το FIREBASE_CONFIG στο assets/config.js δεν έχει έγκυρο apiKey (πρέπει να ξεκινά από «AIza»). Κονσόλα Firebase → Project settings (⚙) → General → Your apps → Config.";
+    const header = document.querySelector("header");
+    if (header && header.nextSibling) document.body.insertBefore(d, header.nextSibling);
+    else document.body.prepend(d);
+  });
+}
+firebase.initializeApp(CFG || {});
 const auth = firebase.auth();
 const db = firebase.database();
 /* ---------- Βοηθητικά ---------- */
