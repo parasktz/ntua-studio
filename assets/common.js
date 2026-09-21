@@ -210,7 +210,8 @@ function baseURL() {
   if (!b.endsWith("/")) b += "/";
   return b;
 }
-const scheduleLink = email => baseURL() + "schedule.html?email=" + encodeURIComponent(normEmail(email));
+/* Ο σύνδεσμος ΔΕΝ περιέχει ποτέ email ή κωδικό — μόνο τη σελίδα εισόδου */
+const scheduleLink = () => baseURL() + "schedule.html";
 
 async function sendMailAuto(to, subject, message) {
   if (!emailReady()) return false;
@@ -244,7 +245,7 @@ async function sendChangeEmail(email, byAdmin) {
   const u = approvedUsers().find(x => normEmail(x.email) === email);
   const name = u ? u.name : email;
   const subject = `Ενημέρωση κρατήσεων βιντεοσκόπησης — ${S.session ? S.session.title : ""}`;
-  const body = `Αγαπητέ/ή ${name},\n\nΟι κρατήσεις σας στο studio ενημερώθηκαν. Τρέχων προγραμματισμός:\n\n${slotsText(email)}\n\nΠροβολή/αλλαγές: ${scheduleLink(email)}`;
+  const body = `Αγαπητέ/ή ${name},\n\nΟι κρατήσεις σας στο studio ενημερώθηκαν. Τρέχων προγραμματισμός:\n\n${slotsText(email)}\n\nΠροβολή/αλλαγές: ${scheduleLink()}`;
   if (await sendMailAuto(email, subject, body)) { toast(`Στάλθηκε email ενημέρωσης στο ${email}.`); return; }
   if (byAdmin) mailFallback(email, subject, body);
 }
