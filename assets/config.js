@@ -1,8 +1,4 @@
-/* =====================================================================
-   ΡΥΘΜΙΣΕΙΣ ΠΛΑΤΦΟΡΜΑΣ — συμπληρώστε τα στοιχεία σας (βλ. README)
-   Το αρχείο αυτό φορτώνεται από όλες τις σελίδες.
-   ===================================================================== */
-
+// Your web app's Firebase configuration
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 // TODO: Add SDKs for Firebase products that you want to use
@@ -18,6 +14,9 @@ const firebaseConfig = {
   messagingSenderId: "310321089066",
   appId: "1:310321089066:web:9b46d1fe8db08ae879d153"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
