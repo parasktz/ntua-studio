@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio Βιντεοσκόπησης — Αρχική</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&subset=greek&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>Studio Βιντεοσκόπησης</div>
+  <div class="session-title" id="topSessionTitle"></div>
+  <div class="spacer"></div>
+  <nav>
+    <a href="index.html" class="active">Αρχική</a>
+    <a href="request.html">Νέος χρήστης</a>
+    <a href="schedule.html">Χρονοπρογραμματισμός</a>
+    <a href="login.html">Διαχειριστής</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <h1>Studio Βιντεοσκόπησης</h1>
+  <p class="sub" id="homeSession">Πλατφόρμα χρονοπρογραμματισμού βιντεοσκοπήσεων.</p>
+
+  <div class="home-grid">
+    <a class="opt-card" href="schedule.html">
+      <h2>Χρονοπρογραμματισμός κράτησης</h2>
+      <p>Για εγκεκριμένους χρήστες: συνδεθείτε με το ιδρυματικό σας email και τον προσωπικό σας κωδικό, δείτε το ημερολόγιο και δηλώστε ή αλλάξτε τα slots σας (έως 4 ώρες/ημέρα).</p>
+      <span class="go">Είσοδος χρήστη →</span>
+    </a>
+    <a class="opt-card" href="request.html">
+      <h2>Νέος χρήστης</h2>
+      <p>Δεν έχετε ακόμη πρόσβαση; Υποβάλετε αίτηση βιντεοσκόπησης με το ιδρυματικό σας email του ΕΜΠ (…ntua.gr) και ορίστε τον προσωπικό σας κωδικό μέσω του email που θα λάβετε.</p>
+      <span class="go">Αίτηση βιντεοσκόπησης →</span>
+    </a>
+    <a class="opt-card" href="login.html">
+      <h2>Διαχειριστής</h2>
+      <p>Ρυθμίσεις περιόδου βιντεοσκοπήσεων, διαθεσιμότητα του studio στο ημερολόγιο, έγκριση αιτημάτων και διαχείριση των κρατήσεων όλων των χρηστών.</p>
+      <span class="go">Είσοδος διαχειριστή →</span>
+    </a>
+  </div>
+</main>
+
+<div id="toast" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+watchData(() => {
+  $("homeSession").textContent = S.session
+    ? `Ενεργή περίοδος: «${S.session.title}» · ${fmtDate(S.session.dateFrom)} – ${fmtDate(S.session.dateTo)}, ώρες ${pad(S.session.hourStart)}:00–${pad(S.session.hourEnd)}:00.`
+    : "Δεν υπάρχει ενεργή περίοδος βιντεοσκοπήσεων αυτή τη στιγμή.";
+});
+</script>
+</body>
+</html>
