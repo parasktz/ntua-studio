@@ -15,6 +15,13 @@ const fmtDate = ds => { const [y,m,d] = ds.split("-"); return `${d}/${m}/${y}`; 
 const dayName = ds => ["Κυρ","Δευ","Τρί","Τετ","Πέμ","Παρ","Σάβ"][new Date(ds+"T12:00:00").getDay()];
 const fmtHour = h => `${pad(h)}:00–${pad(h+1)}:00`;
 const normEmail = e => String(e || "").trim().toLowerCase();
+/* Έλεγχος ιδρυματικού email: το domain πρέπει να είναι ένα από τα
+   ALLOWED_EMAIL_DOMAINS ή subdomain τους (π.χ. mail.ntua.gr) */
+function isAllowedEmail(email) {
+  if (!Array.isArray(ALLOWED_EMAIL_DOMAINS) || !ALLOWED_EMAIL_DOMAINS.length) return true;
+  const d = normEmail(email).split("@")[1] || "";
+  return ALLOWED_EMAIL_DOMAINS.some(dom => d === dom.toLowerCase() || d.endsWith("." + dom.toLowerCase()));
+}
 const daysDiff = ds => Math.round((new Date(ds+"T00:00:00") - new Date(todayStr()+"T00:00:00")) / 86400000);
 
 function toast(msg, err) {
