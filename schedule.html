@@ -91,14 +91,24 @@ window.addEventListener("error", function (e) {
     <h2>Οι κρατήσεις μου</h2>
     <div id="mySlots"></div>
     <div id="calExport" class="hidden" style="margin-top:16px;border-top:1px solid var(--line);padding-top:16px">
-      <label style="margin-top:0">Προσθήκη στο ημερολόγιό μου</label>
-      <p class="hint" style="margin-top:0;margin-bottom:10px">Οι διαδοχικές ώρες της ίδιας ημέρας ενοποιούνται σε μία εγγραφή.</p>
+      <label style="margin-top:0">Προσθήκη όλων στο ημερολόγιό μου</label>
+      <p class="hint" style="margin-top:0;margin-bottom:10px">Ένα κλικ κατεβάζει αρχείο με <strong>όλες</strong> τις κρατήσεις σας (τίτλος «Βιντεοσκόπηση Studio ΕΜΠ», τοποθεσία «Studio ΕΜΠ»). Οι διαδοχικές ώρες της ίδιας ημέρας ενοποιούνται σε μία εγγραφή.</p>
       <div class="btn-row" style="margin-top:0">
-        <button class="btn secondary" type="button" id="btnGCal">Google Calendar</button>
-        <button class="btn secondary" type="button" id="btnICS">Apple / Mac Calendar (.ics)</button>
-        <button class="btn secondary" type="button" id="btnOutlook">Outlook Calendar</button>
+        <button class="btn" type="button" id="btnAddAll">Προσθήκη όλων (αρχείο .ics)</button>
       </div>
       <p class="hint" id="calExportHint" style="margin-top:10px"></p>
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:13.5px;color:var(--muted)">Πώς ανοίγει το αρχείο σε κάθε ημερολόγιο;</summary>
+        <ul class="slots-list" style="margin-top:8px">
+          <li><strong>Apple / Mac / iPhone:</strong> ανοίξτε το αρχείο που κατέβηκε — το Ημερολόγιο προσθέτει όλες τις εγγραφές αυτόματα.</li>
+          <li><strong>Google Calendar:</strong> calendar.google.com → Ρυθμίσεις (γρανάζι) → Εισαγωγή &amp; εξαγωγή → Εισαγωγή → επιλέξτε το αρχείο. Ή, για γρήγορη προσθήκη μίας-μίας, τα κουμπιά παρακάτω.</li>
+          <li><strong>Outlook:</strong> ανοίξτε το αρχείο (desktop) ή outlook.office.com → Προσθήκη ημερολογίου → Μεταφόρτωση από αρχείο.</li>
+        </ul>
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn secondary small" type="button" id="btnGCal">Άνοιγμα σε Google (μία-μία)</button>
+          <button class="btn secondary small" type="button" id="btnOutlook">Άνοιγμα σε Outlook (μία-μία)</button>
+        </div>
+      </details>
     </div>
   </div>
 </main>
@@ -391,13 +401,14 @@ function openEventUrls(urlFn, label) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const g = $("btnGCal"), ics = $("btnICS"), o = $("btnOutlook");
+  const all = $("btnAddAll"), g = $("btnGCal"), o = $("btnOutlook");
+  if (all) all.addEventListener("click", () => {
+    downloadICS();
+    const n = myEvents().length;
+    $("calExportHint").textContent = `Κατέβηκε το αρχείο kratiseis-studio.ics με ${n} ${n === 1 ? "εγγραφή" : "εγγραφές"}. Ανοίξτε το για να προστεθούν όλες μαζί στο ημερολόγιό σας (Apple/Mac/iPhone, Google, Outlook).`;
+  });
   if (g) g.addEventListener("click", () => openEventUrls(gcalUrl, "Google Calendar"));
   if (o) o.addEventListener("click", () => openEventUrls(outlookUrl, "Outlook"));
-  if (ics) ics.addEventListener("click", () => {
-    downloadICS();
-    $("calExportHint").textContent = "Κατέβηκε το αρχείο kratiseis-studio.ics — ανοίξτε το για εισαγωγή σε Apple/Mac Calendar, Outlook desktop ή οποιοδήποτε ημερολόγιο.";
-  });
 });
 </script>
 </body>
