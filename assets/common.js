@@ -196,11 +196,17 @@ function buildCalendar(containerId, who, myEmail, onCellClick) {
 }
 
 /* =====================================================================
-   EMAIL — μόνο Firebase και το πρόγραμμα αλληλογραφίας του διαχειριστή.
-   • Επαναφορά κωδικού: την στέλνει αυτόματα ΤΟ ΙΔΙΟ το Firebase (δωρεάν).
-   • Έγκριση (με 8ψήφιο κωδικό) & ειδοποιήσεις αλλαγών από τον admin:
-     ανοίγει έτοιμο email στο mail client του διαχειριστή για αποστολή
-     με ένα κλικ — καμία εξωτερική υπηρεσία, τίποτα σε URL.
+   ΛΟΓΑΡΙΑΣΜΟΙ & EMAIL — όλα μέσω Firebase, χωρίς τρίτες υπηρεσίες.
+   • Με την ΥΠΟΒΟΛΗ αίτησης δημιουργείται λογαριασμός με κρυπτογραφικά
+     τυχαίο μυστικό (που δεν το γνωρίζει κανείς) και ΤΟ ΙΔΙΟ το Firebase
+     στέλνει αυτόματα email «Ορισμός κωδικού»: ο χρήστης ορίζει τον
+     προσωπικό του κωδικό, ο οποίος δεν λήγει ποτέ.
+   • Κανένας κωδικός δεν ταξιδεύει ποτέ μέσα σε email και ούτε κωδικός
+     ούτε email εμφανίζονται σε URL — ο σύνδεσμος του Firebase περιέχει
+     μόνο ένα μίας χρήσης, χρονικά περιορισμένο token ενέργειας.
+   • Ειδοποιήσεις με ελεύθερο κείμενο (έγκριση, αλλαγές από τον admin)
+     ανοίγουν ως έτοιμα email στο πρόγραμμα αλληλογραφίας του
+     διαχειριστή, για αποστολή με ένα κλικ.
    ===================================================================== */
 function baseURL() {
   let b = APP_URL || location.href.replace(/[?#].*$/, "").replace(/[^\/]*$/, "");
@@ -209,6 +215,43 @@ function baseURL() {
 }
 /* Ο σύνδεσμος ΔΕΝ περιέχει ποτέ email ή κωδικό — μόνο τη σελίδα εισόδου */
 const scheduleLink = () => baseURL() + "schedule.html";
+
+/* Κρυπτογραφικά τυχαίο αρχικό μυστικό λογαριασμού (24 χαρακτήρες).
+   ΔΕΝ αποστέλλεται και ΔΕΝ αποθηκεύεται πουθενά σε αναγνώσιμη μορφή —
+   ο χρήστης ορίζει δικό του κωδικό μέσω του email του Firebase. */
+function randomSecret(len = 24) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const a = new Uint32Array(len);
+  crypto.getRandomValues(a);
+  let p = "";
+  for (let i = 0; i < len; i++) p += chars[a[i] % chars.length];
+  return p;
+}
+
+/* Δεύτερη σύνδεση Firebase, ώστε η δημιουργία λογαριασμού να μην
+   επηρεάζει τον συνδεδεμένο χρήστη/διαχειριστή της σελίδας */
+let _secApp = null;
+function secondaryAuth() {
+  if (!_secApp) _secApp = firebase.initializeApp(FIREBASE_CONFIG, "acctCreate");
+  return _secApp.auth();
+}
+
+/* Δημιουργία λογαριασμού (αν δεν υπάρχει) + email «Ορισμός κωδικού»
+   που στέλνει ΤΟ ΙΔΙΟ το Firebase. Επιστρέφει:
+   "created" | "exists" | "error" */
+async function provisionAccount(email) {
+  email = normEmail(email);
+  try {
+    await secondaryAuth().createUserWithEmailAndPassword(email, randomSecret());
+    await secondaryAuth().signOut();
+    try { await auth.sendPasswordResetEmail(email); } catch (e) {}
+    return "created";
+  } catch (e) {
+    if (e.code === "auth/email-already-in-use") return "exists";
+    console.error("provisionAccount:", e);
+    return "error";
+  }
+}
 
 /* Ανοίγει έτοιμο email στο προεπιλεγμένο πρόγραμμα αλληλογραφίας */
 function openMailDraft(to, subject, message) {
@@ -226,9 +269,9 @@ const slotsText = email => {
 };
 
 /* Αλλαγές σε slots από τον ADMIN → έτοιμο email ενημέρωσης προς τον
-   χρήστη με τον νέο του προγραμματισμό. Διαδοχικές αλλαγές του ίδιου
-   χρήστη ομαδοποιούνται σε ένα email. (Οι αλλαγές που κάνει ο ίδιος ο
-   χρήστης εμφανίζονται ζωντανά στη σελίδα του.) */
+   χρήστη με τον πλήρη νέο προγραμματισμό του. Διαδοχικές αλλαγές του
+   ίδιου χρήστη ομαδοποιούνται σε ένα email. (Οι αλλαγές που κάνει ο
+   ίδιος ο χρήστης εμφανίζονται ζωντανά στη σελίδα του.) */
 const _pendingMail = {};
 function queueChangeEmail(email) {
   email = normEmail(email);
