@@ -6,10 +6,6 @@
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db = firebase.database();
-if (typeof emailjs !== "undefined" && EMAILJS.publicKey) {
-  emailjs.init({ publicKey: EMAILJS.publicKey });
-}
-
 /* ---------- Βοηθητικά ---------- */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -200,11 +196,12 @@ function buildCalendar(containerId, who, myEmail, onCellClick) {
 }
 
 /* =====================================================================
-   EMAIL — δωρεάν: αυτόματα μέσω EmailJS (αν έχει ρυθμιστεί) ή έτοιμο
-   mailto για αποστολή με ένα κλικ από τον διαχειριστή.
+   EMAIL — μόνο Firebase και το πρόγραμμα αλληλογραφίας του διαχειριστή.
+   • Επαναφορά κωδικού: την στέλνει αυτόματα ΤΟ ΙΔΙΟ το Firebase (δωρεάν).
+   • Έγκριση (με 8ψήφιο κωδικό) & ειδοποιήσεις αλλαγών από τον admin:
+     ανοίγει έτοιμο email στο mail client του διαχειριστή για αποστολή
+     με ένα κλικ — καμία εξωτερική υπηρεσία, τίποτα σε URL.
    ===================================================================== */
-const emailReady = () => typeof emailjs !== "undefined" && EMAILJS.publicKey && EMAILJS.serviceId && EMAILJS.templateId;
-
 function baseURL() {
   let b = APP_URL || location.href.replace(/[?#].*$/, "").replace(/[^\/]*$/, "");
   if (!b.endsWith("/")) b += "/";
@@ -213,15 +210,14 @@ function baseURL() {
 /* Ο σύνδεσμος ΔΕΝ περιέχει ποτέ email ή κωδικό — μόνο τη σελίδα εισόδου */
 const scheduleLink = () => baseURL() + "schedule.html";
 
-async function sendMailAuto(to, subject, message) {
-  if (!emailReady()) return false;
-  try {
-    await emailjs.send(EMAILJS.serviceId, EMAILJS.templateId, { to_email: normEmail(to), subject, message });
-    return true;
-  } catch (e) { console.error("EmailJS:", e); return false; }
+/* Ανοίγει έτοιμο email στο προεπιλεγμένο πρόγραμμα αλληλογραφίας */
+function openMailDraft(to, subject, message) {
+  const a = document.createElement("a");
+  a.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
-const mailFallback = (to, subject, message) =>
-  window.open(`mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`);
 
 const slotsText = email => {
   const s = userSlots(email);
@@ -229,23 +225,21 @@ const slotsText = email => {
                   : "— καμία κράτηση —";
 };
 
-/* Οποιαδήποτε αλλαγή σε slot (από χρήστη ή admin) → email με τα νέα slots.
-   Διαδοχικές αλλαγές του ίδιου χρήστη ομαδοποιούνται σε ένα email. */
+/* Αλλαγές σε slots από τον ADMIN → έτοιμο email ενημέρωσης προς τον
+   χρήστη με τον νέο του προγραμματισμό. Διαδοχικές αλλαγές του ίδιου
+   χρήστη ομαδοποιούνται σε ένα email. (Οι αλλαγές που κάνει ο ίδιος ο
+   χρήστης εμφανίζονται ζωντανά στη σελίδα του.) */
 const _pendingMail = {};
-function queueChangeEmail(email, byAdmin) {
+function queueChangeEmail(email) {
   email = normEmail(email);
-  const prev = _pendingMail[email];
-  if (prev) clearTimeout(prev.t);
-  _pendingMail[email] = {
-    byAdmin: byAdmin || (prev && prev.byAdmin) || false,
-    t: setTimeout(() => { const p = _pendingMail[email]; delete _pendingMail[email]; sendChangeEmail(email, p.byAdmin); }, 4000)
-  };
+  clearTimeout(_pendingMail[email]);
+  _pendingMail[email] = setTimeout(() => { delete _pendingMail[email]; openChangeEmail(email); }, 2500);
 }
-async function sendChangeEmail(email, byAdmin) {
+function openChangeEmail(email) {
   const u = approvedUsers().find(x => normEmail(x.email) === email);
   const name = u ? u.name : email;
   const subject = `Ενημέρωση κρατήσεων βιντεοσκόπησης — ${S.session ? S.session.title : ""}`;
-  const body = `Αγαπητέ/ή ${name},\n\nΟι κρατήσεις σας στο studio ενημερώθηκαν. Τρέχων προγραμματισμός:\n\n${slotsText(email)}\n\nΠροβολή/αλλαγές: ${scheduleLink()}`;
-  if (await sendMailAuto(email, subject, body)) { toast(`Στάλθηκε email ενημέρωσης στο ${email}.`); return; }
-  if (byAdmin) mailFallback(email, subject, body);
+  const body = `Αγαπητέ/ή ${name},\n\nΟι κρατήσεις σας στο studio ενημερώθηκαν από τον διαχειριστή. Τρέχων προγραμματισμός:\n\n${slotsText(email)}\n\nΠροβολή/αλλαγές: ${scheduleLink()}`;
+  openMailDraft(email, subject, body);
+  toast(`Άνοιξε email ενημέρωσης προς ${email} — πατήστε αποστολή.`);
 }

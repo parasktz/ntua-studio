@@ -4,20 +4,19 @@
    ===================================================================== */
 
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyByB7YNibl7j5md-BVOAuoKziyfkmiutjk",
-  authDomain: "ntua-studio.firebaseapp.com",
-  databaseURL: "https://ntua-studio-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "ntua-studio",
-  storageBucket: "ntua-studio.firebasestorage.app",
-  messagingSenderId: "310321089066",
-  appId: "1:310321089066:web:9b46d1fe8db08ae879d153"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
 };
 
-
 /* Δημόσιο URL του φακέλου της πλατφόρμας (μπαίνει στους συνδέσμους των
-   email), π.χ. "https://studio.ntua.gr/booking/". Αν μείνει κενό,
+   email), π.χ. "https://studio.uniwa.gr/booking/". Αν μείνει κενό,
    χρησιμοποιείται αυτόματα η τρέχουσα διεύθυνση. */
-const APP_URL = "1:310321089066:web:9b46d1fe8db08ae879d153";
+const APP_URL = "";
 
 const MAX_HOURS_PER_DATE = 4;   // μέγιστες ώρες ανά χρήστη ανά ημέρα
 const LOCK_DAYS = 1;            // αλλαγές έως 1 ημέρα πριν τη βιντεοσκόπηση
